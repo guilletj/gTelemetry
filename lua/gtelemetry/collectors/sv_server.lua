@@ -87,5 +87,13 @@ function GTelemetry.Collectors.Server.Collect()
         {MakeDataPoint(game.MaxPlayers())}
     )
 
+    -- Telemetry health indicator (always 1 if this metric is being emitted)
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.telemetry.active",
+        "Indicates gTelemetry is active and collecting (always 1)",
+        "{flag}",
+        {MakeDataPoint(1)}
+    )
+
     return metrics
 end

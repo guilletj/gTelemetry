@@ -16,6 +16,7 @@ local _netMessagesReceived = 0
 local _netMessagesSentByName = {}
 local _netMessagesReceivedByName = {}
 local _startTimeNano = nil
+local _initialized = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -24,6 +25,8 @@ local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
 function GTelemetry.Collectors.Network.Init()
+    if _initialized then return end
+    _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum

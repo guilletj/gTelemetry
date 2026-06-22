@@ -83,7 +83,7 @@ function GTelemetry.Collectors.Entities.Collect()
             if IsValid(owner) and owner:IsPlayer() then
                 local sid = owner:SteamID()
                 if not perPlayer[sid] then
-                    perPlayer[sid] = { name = owner:Nick(), types = {} }
+                    perPlayer[sid] = { name = owner:Nick(), types = {}, others = {} }
                 end
                 local entityType = "other"
                 if string.StartWith(class, "prop_physics") or class == "prop_dynamic" then
@@ -101,7 +101,11 @@ function GTelemetry.Collectors.Entities.Collect()
                 elseif ent:IsWeapon() then
                     entityType = "weapon"
                 end
-                perPlayer[sid].types[entityType] = (perPlayer[sid].types[entityType] or 0) + 1
+                if entityType == "other" then
+                    perPlayer[sid].others[class] = (perPlayer[sid].others[class] or 0) + 1
+                else
+                    perPlayer[sid].types[entityType] = (perPlayer[sid].types[entityType] or 0) + 1
+                end
             end
         end
     end
@@ -211,6 +215,14 @@ function GTelemetry.Collectors.Entities.Collect()
                     Attribute("player.name", data.name),
                     Attribute("player.steam_id", sid),
                     Attribute("entity.type", etype),
+                })
+            end
+            for class, count in pairs(data.others) do
+                ownedPoints[#ownedPoints + 1] = MakeDataPoint(count, {
+                    Attribute("player.name", data.name),
+                    Attribute("player.steam_id", sid),
+                    Attribute("entity.type", "other"),
+                    Attribute("entity.class", class),
                 })
             end
         end

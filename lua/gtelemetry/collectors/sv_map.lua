@@ -11,6 +11,7 @@ GTelemetry.Collectors.Map = {}
 -- Track map changes
 local _mapChanges = 0
 local _startTimeNano = nil
+local _initialized = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -19,6 +20,8 @@ local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
 function GTelemetry.Collectors.Map.Init()
+    if _initialized then return end
+    _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum

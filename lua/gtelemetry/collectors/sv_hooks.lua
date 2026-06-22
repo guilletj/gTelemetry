@@ -14,6 +14,7 @@ local _thinkTime = 0      -- Last measured Think hook execution time
 local _tickTime = 0        -- Last measured Tick hook execution time
 local _luaErrors = 0       -- Cumulative Lua error count
 local _startTimeNano = nil
+local _initialized = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -22,6 +23,9 @@ local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
 function GTelemetry.Collectors.Hooks.Init()
+    if _initialized then return end
+    _initialized = true
+
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
@@ -33,6 +37,7 @@ function GTelemetry.Collectors.Hooks.Init()
     -- We add a high-priority pre/post wrapper around Think
     local thinkStartTime = 0
     hook.Add("Think", "GTelemetry_ThinkPre", function()
+        if not GTelemetry.Config.IsEnabled() then return end
         thinkStartTime = SysTime()
     end)
 
@@ -47,6 +52,7 @@ function GTelemetry.Collectors.Hooks.Init()
     -- Measure Tick hook total time
     local tickStartTime = 0
     hook.Add("Tick", "GTelemetry_TickPre", function()
+        if not GTelemetry.Config.IsEnabled() then return end
         tickStartTime = SysTime()
     end)
 
