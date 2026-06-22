@@ -19,6 +19,12 @@ local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
+-- Register immediately (not inside Init) so it catches InitPostEntity on first load
+hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
+    _mapChanges = _mapChanges + 1
+    GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
+end)
+
 function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true
@@ -28,12 +34,6 @@ function GTelemetry.Collectors.Map.Init()
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
-
-    -- Track map initialization
-    hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
-        _mapChanges = _mapChanges + 1
-        GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
-    end)
 end
 
 --- Collect map and server info metrics.

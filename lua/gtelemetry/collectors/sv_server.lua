@@ -95,5 +95,15 @@ function GTelemetry.Collectors.Server.Collect()
         {MakeDataPoint(1)}
     )
 
+    -- Time spent collecting and sending metrics in the last cycle
+    if GTelemetry.LastCollectionDuration then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.server.collection_duration",
+            "Time spent collecting and sending metrics in the last cycle",
+            "s",
+            {MakeDataPoint(GTelemetry.LastCollectionDuration)}
+        )
+    end
+
     return metrics
 end

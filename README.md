@@ -157,6 +157,8 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.server.lua_memory` | Gauge | Lua state memory usage (bytes) |
 | `gmod.server.uptime` | Gauge | Server uptime since map load (seconds) |
 | `gmod.server.max_players` | Gauge | Maximum player slots |
+| `gmod.telemetry.active` | Gauge | Indicates gTelemetry is active and collecting (always 1) |
+| `gmod.server.collection_duration` | Gauge | Time spent collecting and sending metrics in the last cycle (seconds) |
 
 ### Players (`sv_players.lua`)
 
@@ -173,14 +175,21 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 
 ### Entities (`sv_entities.lua`)
 
-| Metric | Type | Description |
-|---|---|---|
-| `gmod.entities.total` | Gauge | Total entity count |
-| `gmod.entities.props` | Gauge | Prop entities |
-| `gmod.entities.npcs` | Gauge | NPC entities |
-| `gmod.entities.players` | Gauge | Player entities |
-| `gmod.entities.weapons` | Gauge | Weapon entities |
-| `gmod.entities.vehicles` | Gauge | Vehicle entities |
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `gmod.entities.total` | Gauge | — | Total entity count |
+| `gmod.entities.props` | Gauge | — | Prop entities |
+| `gmod.entities.ragdolls` | Gauge | — | Ragdoll entities |
+| `gmod.entities.npcs` | Gauge | — | NPC entities |
+| `gmod.entities.players` | Gauge | — | Player entities |
+| `gmod.entities.weapons` | Gauge | — | Weapon entities |
+| `gmod.entities.vehicles` | Gauge | — | Vehicle entities |
+| `gmod.entities.doors` | Gauge | — | Door entities |
+| `gmod.entities.scripted_ents` | Gauge | — | Scripted entities (SENTs) |
+| `gmod.entities.constraints` | Gauge | — | Constraint/rope/hydraulic entities |
+| `gmod.entities.effects` | Gauge | — | Effect entities |
+| `gmod.physics.objects` | Gauge | — | Entities with an active physics object |
+| `gmod.entities.owned_by_player` | Gauge | `player.name`, `player.steam_id`, `entity.type`, `entity.class` | Entities owned per player, grouped by type |
 
 ### Network (`sv_network.lua`)
 
@@ -199,8 +208,8 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `gmod.hooks.count` | Gauge | — | Total registered hooks |
-| `gmod.hooks.think_time` | Gauge | — | Think hook execution time (seconds) |
-| `gmod.hooks.tick_time` | Gauge | — | Tick hook execution time (seconds) |
+| `gmod.hooks.think_total` | Sum | — | Cumulative Think hook executions since server start |
+| `gmod.hooks.tick_total` | Sum | — | Cumulative Tick hook executions since server start |
 | `gmod.lua.errors` | Sum | — | Cumulative Lua error count |
 | `gmod.hooks.by_event` | Gauge | `hook.event` | Hooks per event type |
 

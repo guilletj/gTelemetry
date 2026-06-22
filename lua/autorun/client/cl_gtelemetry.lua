@@ -14,7 +14,12 @@ timer.Create("GTelemetry_ClientFPS", SEND_INTERVAL, 0, function()
 
     local fps = math.min(1 / frameTime, 999)
 
-    net.Start("GTelemetry_ClientData")
-        net.WriteFloat(fps)
-    net.SendToServer()
+    local ok, err = pcall(function()
+        net.Start("GTelemetry_ClientData")
+            net.WriteFloat(fps)
+        net.SendToServer()
+    end)
+    if not ok and GTelemetry and GTelemetry.Debug then
+        GTelemetry.Debug("Failed to send client FPS: " .. tostring(err))
+    end
 end)

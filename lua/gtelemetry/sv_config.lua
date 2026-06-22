@@ -69,6 +69,12 @@ GTelemetry.Config.ConVars = {
         "Enable detailed net message name breakdown metrics (may cause high cardinality).",
         0, 1
     ),
+
+    version = CreateConVar(
+        "gtelemetry_version", GTelemetry.Version or "1.0.0",
+        FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
+        "Version of gTelemetry currently running."
+    ),
 }
 
 --- Returns whether gTelemetry is enabled.
@@ -80,7 +86,11 @@ end
 --- Returns the OTLP endpoint URL.
 -- @return string
 function GTelemetry.Config.GetEndpoint()
-    return GTelemetry.Config.ConVars.endpoint:GetString()
+    local url = GTelemetry.Config.ConVars.endpoint:GetString()
+    if url ~= "" and not string.match(url, "^https?://") then
+        GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
+    end
+    return url
 end
 
 --- Returns the collection interval in seconds.
@@ -177,7 +187,7 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
     local enabled = newVal == "1"
     if enabled then
         GTelemetry.Log("Telemetry enabled")
-        if GTelemetry.StartCollection then
+        if GTelemetry.StartCollection and not timer.Exists("GTelemetry_Collect") then
             GTelemetry.StartCollection()
         end
     else

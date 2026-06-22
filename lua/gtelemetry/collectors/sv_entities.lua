@@ -12,6 +12,80 @@ local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
 
+-- Entity type classification constants
+local ENTITY_PROPS = 1
+local ENTITY_RAGDOLL = 2
+local ENTITY_NPC = 3
+local ENTITY_WEAPON = 4
+local ENTITY_VEHICLE = 5
+local ENTITY_DOOR = 6
+local ENTITY_SCRIPTED = 7
+local ENTITY_CONSTRAINT = 8
+local ENTITY_EFFECT = 9
+local ENTITY_OTHER = 10
+
+-- Entity classes that NEVER have physics objects (blacklist for GetPhysicsObject optimization)
+local _noPhysicsPrefix = {
+    env_ = true,
+    point_ = true,
+    info_ = true,
+    path_ = true,
+    logic_ = true,
+    ai_ = true,
+}
+
+--- Classify an entity into a numeric type.
+-- @param ent Entity
+-- @param class string pre-fetched class name
+-- @return number entity type constant
+local function ClassifyEntity(ent, class)
+    if string.StartWith(class, "prop_physics") or class == "prop_dynamic" then
+        return ENTITY_PROPS
+    elseif class == "prop_ragdoll" then
+        return ENTITY_RAGDOLL
+    elseif string.StartWith(class, "npc_") then
+        return ENTITY_NPC
+    elseif ent:IsWeapon() then
+        return ENTITY_WEAPON
+    elseif ent:IsVehicle() then
+        return ENTITY_VEHICLE
+    elseif string.StartWith(class, "prop_door") or string.StartWith(class, "func_door") then
+        return ENTITY_DOOR
+    elseif string.StartWith(class, "sent_") or string.StartWith(class, "gmod_") then
+        return ENTITY_SCRIPTED
+    elseif string.StartWith(class, "constraint_") or string.StartWith(class, "rope_") or string.StartWith(class, "hydraulic_") then
+        return ENTITY_CONSTRAINT
+    elseif string.StartWith(class, "env_") then
+        return ENTITY_EFFECT
+    end
+    return ENTITY_OTHER
+end
+
+--- Check if an entity class may have a physics object (avoids expensive GetPhysicsObject call on known non-physics entities).
+-- @param class string class name
+-- @return boolean
+local function EntityHasPhysics(class)
+    for prefix in pairs(_noPhysicsPrefix) do
+        if string.StartWith(class, prefix) then return false end
+    end
+    return true
+end
+
+local function TypeName(t)
+    local names = {
+        [ENTITY_PROPS] = "prop",
+        [ENTITY_RAGDOLL] = "ragdoll",
+        [ENTITY_NPC] = "npc",
+        [ENTITY_WEAPON] = "weapon",
+        [ENTITY_VEHICLE] = "vehicle",
+        [ENTITY_DOOR] = "door",
+        [ENTITY_SCRIPTED] = "scripted_ent",
+        [ENTITY_CONSTRAINT] = "constraint",
+        [ENTITY_EFFECT] = "effect",
+    }
+    return names[t] or "other"
+end
+
 function GTelemetry.Collectors.Entities.Init()
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
@@ -27,50 +101,28 @@ function GTelemetry.Collectors.Entities.Collect()
     local allEnts = ents.GetAll()
     local totalCount = #allEnts
 
-    local propCount = 0
-    local npcCount = 0
-    local weaponCount = 0
-    local vehicleCount = 0
-    local ragdollCount = 0
-    local constraintCount = 0
-    local scriptedEntCount = 0
-    local doorCount = 0
-    local effectCount = 0
-    local physicsCount = 0
+    local typeCounts = {}
 
     local perPlayer = {} -- [steamID] = { name, types: { [type] = count } }
 
     local trackPerPlayer = GTelemetry.Config.IsEntitiesPerPlayerEnabled()
 
+    local physicsCount = 0
+
     for _, ent in ipairs(allEnts) do
         if not IsValid(ent) then continue end
 
         local class = ent:GetClass()
+        local etype = ClassifyEntity(ent, class)
 
-        if string.StartWith(class, "prop_physics") or class == "prop_dynamic" then
-            propCount = propCount + 1
-        elseif class == "prop_ragdoll" then
-            ragdollCount = ragdollCount + 1
-        elseif string.StartWith(class, "npc_") then
-            npcCount = npcCount + 1
-        elseif ent:IsWeapon() then
-            weaponCount = weaponCount + 1
-        elseif ent:IsVehicle() then
-            vehicleCount = vehicleCount + 1
-        elseif string.StartWith(class, "prop_door") or string.StartWith(class, "func_door") then
-            doorCount = doorCount + 1
-        elseif string.StartWith(class, "sent_") or string.StartWith(class, "gmod_") then
-            scriptedEntCount = scriptedEntCount + 1
-        elseif string.StartWith(class, "constraint_") or string.StartWith(class, "rope_") or string.StartWith(class, "hydraulic_") then
-            constraintCount = constraintCount + 1
-        elseif string.StartWith(class, "env_") then
-            effectCount = effectCount + 1
-        end
+        typeCounts[etype] = (typeCounts[etype] or 0) + 1
 
-        -- Physics objects
-        local phys = ent:GetPhysicsObject()
-        if IsValid(phys) then
-            physicsCount = physicsCount + 1
+        -- Physics objects (only check classes that can have physics)
+        if EntityHasPhysics(class) then
+            local phys = ent:GetPhysicsObject()
+            if IsValid(phys) then
+                physicsCount = physicsCount + 1
+            end
         end
 
         -- Per-player ownership tracking
@@ -85,26 +137,11 @@ function GTelemetry.Collectors.Entities.Collect()
                 if not perPlayer[sid] then
                     perPlayer[sid] = { name = owner:Nick(), types = {}, others = {} }
                 end
-                local entityType = "other"
-                if string.StartWith(class, "prop_physics") or class == "prop_dynamic" then
-                    entityType = "prop"
-                elseif class == "prop_ragdoll" then
-                    entityType = "ragdoll"
-                elseif string.StartWith(class, "prop_door") or string.StartWith(class, "func_door") then
-                    entityType = "door"
-                elseif string.StartWith(class, "sent_") or string.StartWith(class, "gmod_") then
-                    entityType = "scripted_ent"
-                elseif string.StartWith(class, "constraint_") or string.StartWith(class, "rope_") or string.StartWith(class, "hydraulic_") then
-                    entityType = "constraint"
-                elseif ent:IsVehicle() then
-                    entityType = "vehicle"
-                elseif ent:IsWeapon() then
-                    entityType = "weapon"
-                end
-                if entityType == "other" then
+                if etype == ENTITY_OTHER then
                     perPlayer[sid].others[class] = (perPlayer[sid].others[class] or 0) + 1
                 else
-                    perPlayer[sid].types[entityType] = (perPlayer[sid].types[entityType] or 0) + 1
+                    local name = TypeName(etype)
+                    perPlayer[sid].types[name] = (perPlayer[sid].types[name] or 0) + 1
                 end
             end
         end
@@ -123,7 +160,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.props",
         "Number of prop entities",
         "{entities}",
-        {MakeDataPoint(propCount)}
+        {MakeDataPoint(typeCounts[ENTITY_PROPS] or 0)}
     )
 
     -- Ragdolls
@@ -131,7 +168,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.ragdolls",
         "Number of ragdoll entities",
         "{entities}",
-        {MakeDataPoint(ragdollCount)}
+        {MakeDataPoint(typeCounts[ENTITY_RAGDOLL] or 0)}
     )
 
     -- NPCs
@@ -139,7 +176,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.npcs",
         "Number of NPC entities",
         "{entities}",
-        {MakeDataPoint(npcCount)}
+        {MakeDataPoint(typeCounts[ENTITY_NPC] or 0)}
     )
 
     -- Players (entity count)
@@ -155,7 +192,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.weapons",
         "Number of weapon entities",
         "{entities}",
-        {MakeDataPoint(weaponCount)}
+        {MakeDataPoint(typeCounts[ENTITY_WEAPON] or 0)}
     )
 
     -- Vehicles
@@ -163,7 +200,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.vehicles",
         "Number of vehicle entities",
         "{entities}",
-        {MakeDataPoint(vehicleCount)}
+        {MakeDataPoint(typeCounts[ENTITY_VEHICLE] or 0)}
     )
 
     -- Doors
@@ -171,7 +208,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.doors",
         "Number of door entities",
         "{entities}",
-        {MakeDataPoint(doorCount)}
+        {MakeDataPoint(typeCounts[ENTITY_DOOR] or 0)}
     )
 
     -- Scripted entities (SENTs)
@@ -179,7 +216,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.scripted_ents",
         "Number of scripted entities (SENTs)",
         "{entities}",
-        {MakeDataPoint(scriptedEntCount)}
+        {MakeDataPoint(typeCounts[ENTITY_SCRIPTED] or 0)}
     )
 
     -- Constraints
@@ -187,7 +224,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.constraints",
         "Number of constraint/rope/hydraulic entities",
         "{entities}",
-        {MakeDataPoint(constraintCount)}
+        {MakeDataPoint(typeCounts[ENTITY_CONSTRAINT] or 0)}
     )
 
     -- Effects
@@ -195,7 +232,7 @@ function GTelemetry.Collectors.Entities.Collect()
         "gmod.entities.effects",
         "Number of effect entities",
         "{entities}",
-        {MakeDataPoint(effectCount)}
+        {MakeDataPoint(typeCounts[ENTITY_EFFECT] or 0)}
     )
 
     -- Physics objects
