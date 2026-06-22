@@ -1,0 +1,264 @@
+# gTelemetry — GMod Telemetry
+
+A Garry's Mod server monitoring addon that exports telemetry metrics to **Grafana** via **Grafana Alloy** using the **OpenTelemetry (OTLP/HTTP JSON)** protocol.
+
+Monitor your GMod server's performance, players, entities, network, Lua errors, and more — all from beautiful Grafana dashboards.
+
+## Architecture
+
+```
+┌─────────────────────┐  HTTP POST (OTLP/JSON)  ┌─────────────────────┐
+│    GMod Server      │  ─────────────────────> │   Grafana Alloy     │
+│  ┌───────────────┐  │   :4318/v1/metrics      │  otelcol receiver   │
+│  │  gTelemetry   │  │                         └──────────┬──────────┘
+│  │    (Lua)      │  │                                    │
+│  └───────────────┘  │                         ┌──────────┴──────────┐
+│  ┌───────────────┐  │                         │                     │
+│  │ Client module │  │                    ┌────┴─────┐         ┌─────┴────┐
+│  │ (FPS data)    │  │                    │Prometheus│         │ InfluxDB │
+│  └───────────────┘  │                    └────┬─────┘         └─────┬────┘
+└─────────────────────┘                         └──────────┬──────────┘
+                                                     ┌─────┴─────┐
+                                                     │  Grafana  │
+                                                     └───────────┘
+```
+
+## Features
+
+- **~50 metrics** across 8 collectors
+- **Zero dependencies** — uses native GMod `HTTP()` function
+- **OTLP standard** — compatible with any OpenTelemetry-compatible backend
+- **DarkRP auto-detection** — economic metrics load automatically when DarkRP is present
+- **Client FPS tracking** — collects client performance data via net library
+- **Configurable** — all settings via server ConVars
+- **Lightweight** — minimal performance impact, async HTTP sends
+
+## Installation
+
+1. Copy the entire addon folder to your GMod server's `addons` directory:
+   ```
+   garrysmod/addons/gTelemetry/
+   ├── lua/
+   │   ├── autorun/
+   │   │   ├── server/gtelemetry_init.lua
+   │   │   └── client/cl_gtelemetry.lua
+   │   └── gtelemetry/
+   │       ├── sv_config.lua
+   │       ├── sv_otlp.lua
+   │       └── collectors/
+   │           ├── sv_server.lua
+   │           ├── sv_players.lua
+   │           ├── sv_entities.lua
+   │           ├── sv_network.lua
+   │           ├── sv_hooks.lua
+   │           ├── sv_map.lua
+   │           ├── sv_chat.lua
+   │           └── sv_darkrp.lua
+   └── README.md
+   ```
+
+2. **Required:** Start your server with the `-allowlocalhttp` launch parameter to allow HTTP requests to local/private IP addresses:
+   ```
+   srcds.exe -game garrysmod +gamemode sandbox +map gm_construct -allowlocalhttp
+   ```
+
+3. Restart the server or run `lua_openscript autorun/server/gtelemetry_init.lua` in the console.
+
+## Configuration
+
+All configuration is done via server ConVars, either in `server.cfg` or the server console.
+
+| ConVar | Default | Description |
+|---|---|---|
+| `gtelemetry_enabled` | `1` | Master enable/disable switch |
+| `gtelemetry_endpoint` | `http://localhost:4318/v1/metrics` | Alloy OTLP HTTP endpoint URL |
+| `gtelemetry_interval` | `10` | Collection/push interval in seconds (1-300) |
+| `gtelemetry_service_name` | `gmod-server` | OTLP service.name attribute (identifies this server in Grafana) |
+| `gtelemetry_auth_token` | *(empty)* | Optional Bearer token for Alloy authentication |
+| `gtelemetry_debug` | `0` | Enable verbose debug logging to server console |
+| `gtelemetry_darkrp` | `1` | Enable DarkRP economic metrics (still requires DarkRP to be installed) |
+
+### Example server.cfg
+
+```
+// gTelemetry configuration
+gtelemetry_enabled 1
+gtelemetry_endpoint "http://192.168.1.100:4318/v1/metrics"
+gtelemetry_interval 15
+gtelemetry_service_name "my-darkrp-server"
+gtelemetry_debug 0
+```
+
+## Setting Up Grafana Alloy
+
+### 1. Install Grafana Alloy
+
+Follow the [official Alloy installation guide](https://grafana.com/docs/alloy/latest/get-started/install/) for your platform.
+
+### 2. Configure Alloy
+
+Use the example configuration in `docs/alloy_example.hcl` as a starting point:
+
+```hcl
+// Receive OTLP metrics from gTelemetry
+otelcol.receiver.otlp "gmod" {
+    http {
+        endpoint = "0.0.0.0:4318"
+    }
+    output {
+        metrics = [otelcol.processor.batch.default.input]
+    }
+}
+
+// Batch before exporting
+otelcol.processor.batch "default" {
+    timeout = "5s"
+    output {
+        metrics = [otelcol.exporter.prometheus.default.input]
+    }
+}
+
+// Export to Prometheus
+otelcol.exporter.prometheus "default" {
+    forward_to = [prometheus.remote_write.default.receiver]
+}
+
+prometheus.remote_write "default" {
+    endpoint {
+        url = "http://localhost:9090/api/v1/write"
+    }
+}
+```
+
+### 3. Run Alloy
+
+```bash
+alloy run config.alloy
+```
+
+Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI).
+
+### 4. Set Up Grafana
+
+1. Add your Prometheus or InfluxDB as a data source in Grafana
+2. Create dashboards using the metrics listed below
+3. All metrics are prefixed with `gmod.` for easy filtering
+
+## Metrics Reference
+
+### Server Performance (`sv_server.lua`)
+
+| Metric | Type | Description |
+|---|---|---|
+| `gmod.server.tickrate` | Gauge | Configured server tick rate (Hz) |
+| `gmod.server.tick_interval` | Gauge | Time between server ticks (seconds) |
+| `gmod.server.frametime` | Gauge | Actual server frame time (seconds) |
+| `gmod.server.fps` | Gauge | Server frames per second |
+| `gmod.server.lua_memory` | Gauge | Lua state memory usage (bytes) |
+| `gmod.server.uptime` | Gauge | Server uptime since map load (seconds) |
+| `gmod.server.max_players` | Gauge | Maximum player slots |
+
+### Players (`sv_players.lua`)
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `gmod.players.count` | Gauge | — | Connected player count |
+| `gmod.players.bots` | Gauge | — | Connected bot count |
+| `gmod.players.ping` | Gauge | `player.name`, `player.steam_id` | Per-player ping (ms) |
+| `gmod.players.ping_avg` | Gauge | — | Average ping across humans |
+| `gmod.players.client_fps` | Gauge | `player.name`, `player.steam_id` | Client-reported FPS |
+| `gmod.players.kills` | Sum | `player.name`, `player.steam_id` | Cumulative kills |
+| `gmod.players.deaths` | Sum | `player.name`, `player.steam_id` | Cumulative deaths |
+| `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (seconds) |
+
+### Entities (`sv_entities.lua`)
+
+| Metric | Type | Description |
+|---|---|---|
+| `gmod.entities.total` | Gauge | Total entity count |
+| `gmod.entities.props` | Gauge | Prop entities |
+| `gmod.entities.npcs` | Gauge | NPC entities |
+| `gmod.entities.players` | Gauge | Player entities |
+| `gmod.entities.weapons` | Gauge | Weapon entities |
+| `gmod.entities.vehicles` | Gauge | Vehicle entities |
+
+### Network (`sv_network.lua`)
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `gmod.network.net_messages_out` | Sum | — | Net messages sent by server |
+| `gmod.network.net_messages_in` | Sum | — | Net messages received by server |
+| `gmod.network.messages_out_details` | Sum | `net.message` | Net messages sent per message name |
+| `gmod.network.messages_in_details` | Sum | `net.message` | Net messages received per message name |
+| `gmod.network.active_receivers` | Gauge | — | Total registered net message receivers |
+| `gmod.network.packet_loss_avg` | Gauge | — | Average packet loss (%) |
+| `gmod.network.packet_loss` | Gauge | `player.name`, `player.steam_id` | Per-player packet loss (%) |
+
+### Hooks & Errors (`sv_hooks.lua`)
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `gmod.hooks.count` | Gauge | — | Total registered hooks |
+| `gmod.hooks.think_time` | Gauge | — | Think hook execution time (seconds) |
+| `gmod.hooks.tick_time` | Gauge | — | Tick hook execution time (seconds) |
+| `gmod.lua.errors` | Sum | — | Cumulative Lua error count |
+| `gmod.hooks.by_event` | Gauge | `hook.event` | Hooks per event type |
+
+### Map & Server Info (`sv_map.lua`)
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `gmod.server.info` | Gauge | `server.map`, `server.gamemode`, `server.hostname`, `server.ip` | Server info (always 1) |
+| `gmod.map.changes` | Sum | — | Map change count |
+
+### Chat & Admin (`sv_chat.lua`)
+
+| Metric | Type | Description |
+|---|---|---|
+| `gmod.chat.messages` | Sum | Total chat messages |
+| `gmod.admin.commands` | Sum | Admin commands executed |
+
+### DarkRP Economy (`sv_darkrp.lua`)
+
+*Only available when DarkRP is detected.*
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `gmod.darkrp.money_total` | Gauge | — | Total money in circulation |
+| `gmod.darkrp.money_avg` | Gauge | — | Average money per player |
+| `gmod.darkrp.job_count` | Gauge | `darkrp.job` | Players per job |
+| `gmod.darkrp.props_per_player` | Gauge | `player.name`, `player.steam_id` | Props per player |
+| `gmod.darkrp.wanted_count` | Gauge | — | Wanted players |
+| `gmod.darkrp.arrested_count` | Gauge | — | Arrested players |
+
+## Troubleshooting
+
+### Metrics not reaching Alloy
+
+1. **Check `-allowlocalhttp`**: GMod blocks HTTP requests to private IPs by default. Ensure your server start script includes `-allowlocalhttp`.
+
+2. **Check the endpoint**: Run `gtelemetry_debug 1` in the server console to see detailed logging. Verify the endpoint URL matches your Alloy configuration.
+
+3. **Check Alloy is running**: Open `http://<alloy-host>:12345` in a browser to access Alloy's built-in UI.
+
+4. **Firewall**: Ensure port 4318 is open between your GMod server and Alloy.
+
+### DarkRP metrics not appearing
+
+- DarkRP must be fully loaded before gTelemetry can detect it. If you see "DarkRP detected" in the server console, it's working.
+- Ensure `gtelemetry_darkrp` is set to `1`.
+- Verify the gamemode is actually DarkRP (not a derivative that doesn't expose standard DarkRP functions).
+
+### High CPU usage
+
+- Increase the collection interval: `gtelemetry_interval 30`
+- The addon is designed to be lightweight, but on very large servers (64+ players) with many entities, consider increasing the interval.
+
+### Authentication errors
+
+- If your Alloy instance requires authentication, set the Bearer token: `gtelemetry_auth_token "your-token-here"`
+- The ConVar is marked as `FCVAR_PROTECTED` so it won't appear in server info queries.
+
+## License
+
+MIT License — Feel free to use, modify, and distribute.
