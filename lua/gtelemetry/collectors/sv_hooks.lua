@@ -2,7 +2,7 @@
     gTelemetry: GMod Telemetry
     collectors/sv_hooks.lua — Hook performance & error tracking
 
-    Collects: total hook count, Think/Tick hook call count, Lua errors,
+    Collects: total hook count, Think/Tick call count & timing, Lua errors,
     hook count per event type.
 ]]
 
@@ -10,9 +10,13 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Hooks = {}
 
 -- Performance tracking state
-local _thinkCount = 0      -- Cumulative Think hook call count
-local _tickCount = 0        -- Cumulative Tick hook call count
-local _luaErrors = 0        -- Cumulative Lua error count
+local _thinkCount = 0       -- Cumulative Think hook call count
+local _tickCount = 0         -- Cumulative Tick hook call count
+local _thinkTime = 0         -- Last Think hook execution time (seconds)
+local _tickTime = 0          -- Last Tick hook execution time (seconds)
+local _startThinkTime = 0    -- SysTime at start of Think chain
+local _startTickTime = 0     -- SysTime at start of Tick chain
+local _luaErrors = 0         -- Cumulative Lua error count
 local _startTimeNano = nil
 local _initialized = false
 
@@ -35,15 +39,27 @@ function GTelemetry.Collectors.Hooks.Init()
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 
-    -- Count Think executions
-    hook.Add("Think", "GTelemetry_ThinkCounter", function()
-        _thinkCount = _thinkCount + 1
-    end)
+    -- Measure Think execution time via pre/post hooks.
+    -- Priority 10 runs before all default-priority (0) hooks.
+    -- Priority -10 runs after all default-priority hooks.
+    hook.Add("Think", "GTelemetry_ThinkStart", function()
+        _startThinkTime = SysTime()
+    end, 10)
 
-    -- Count Tick executions
-    hook.Add("Tick", "GTelemetry_TickCounter", function()
+    hook.Add("Think", "GTelemetry_ThinkEnd", function()
+        _thinkTime = SysTime() - _startThinkTime
+        _thinkCount = _thinkCount + 1
+    end, -10)
+
+    -- Measure Tick execution time via pre/post hooks.
+    hook.Add("Tick", "GTelemetry_TickStart", function()
+        _startTickTime = SysTime()
+    end, 10)
+
+    hook.Add("Tick", "GTelemetry_TickEnd", function()
+        _tickTime = SysTime() - _startTickTime
         _tickCount = _tickCount + 1
-    end)
+    end, -10)
 
     -- Track Lua errors
     hook.Add("OnLuaError", "GTelemetry_LuaErrors", function(error, realm, stack, name, id)
@@ -105,6 +121,22 @@ function GTelemetry.Collectors.Hooks.Collect()
         "{calls}",
         {MakeCumulativeDataPoint(_tickCount, _startTimeNano)},
         true
+    )
+
+    -- Think hook execution time (last frame)
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.hooks.think_time",
+        "Time spent executing Think hooks in the last frame",
+        "s",
+        {MakeDataPoint(math.Round(_thinkTime, 6))}
+    )
+
+    -- Tick hook execution time (last tick)
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.hooks.tick_time",
+        "Time spent executing Tick hooks in the last tick",
+        "s",
+        {MakeDataPoint(math.Round(_tickTime, 6))}
     )
 
     -- Lua errors (cumulative counter)
