@@ -93,6 +93,12 @@ if game.GetMap() and game.GetMap() ~= "" then
     timer.Simple(1, function()
         if not timer.Exists("GTelemetry_Collect") and GTelemetry.Config.IsEnabled() then
             GTelemetry.StartCollection()
+
+            -- Count current map since InitPostEntity already fired before module load
+            if GTelemetry.Collectors.Map and GTelemetry.Collectors.Map.CountChange then
+                GTelemetry.Collectors.Map.CountChange()
+            end
+
             GTelemetry.Log("v" .. GTelemetry.Version .. " late-initialized")
             if GTelemetry.PrintBanner then
                 GTelemetry.PrintBanner()
@@ -106,7 +112,9 @@ end
 
 -- Clean shutdown
 hook.Add("ShutDown", "GTelemetry_Shutdown", function()
-    -- Attempt one final metrics push before shutting down
+    -- Attempt one final metrics push before shutting down.
+    -- NOTE: HTTP() is asynchronous; the server may close before the
+    -- request completes, causing the final payload to be lost.
     if GTelemetry.Config.IsEnabled() then
         GTelemetry.Debug("Server shutting down, sending final metrics...")
         GTelemetry.OTLP.CollectAndSend()

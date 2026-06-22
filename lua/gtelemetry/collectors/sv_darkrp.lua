@@ -32,8 +32,9 @@ function GTelemetry.Collectors.DarkRP.Collect()
     if not MakeGauge then GTelemetry.Collectors.DarkRP.Init() end
 
     -- Skip if DarkRP is not available or disabled
-    if not GTelemetry.Collectors.DarkRP.IsAvailable() then return {} end
-    if not GTelemetry.Config.IsDarkRPEnabled() then return {} end
+    -- Return nil so CollectAndSend skips the iteration gracefully
+    if not GTelemetry.Collectors.DarkRP.IsAvailable() then return nil end
+    if not GTelemetry.Config.IsDarkRPEnabled() then return nil end
 
     local metrics = {}
     local players = player.GetAll()

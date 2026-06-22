@@ -16,9 +16,9 @@ local tostring = tostring
 local string_format = string.format
 local table_insert = table.insert
 
--- Track the SysTime offset to get nanosecond-precision timestamps
--- os.time() gives epoch seconds, SysTime() gives high-res relative time
-local _epochOffset = os_time() - SysTime()
+-- os.time() gives epoch seconds (accurate, no drift)
+-- SysTime() gives high-res time, used only for fractional seconds
+-- This avoids drift between SysTime() and wall clock over long uptimes
 
 -- Cooldown counter to avoid console spam on persistent failures
 local _consecutiveFailures = 0
@@ -29,12 +29,14 @@ local _isCollecting = false
 
 --- Returns the current time in nanoseconds since Unix epoch as a string.
 -- OTLP requires timestamps as nanosecond strings.
+-- Uses os.time() for whole seconds (no drift) and SysTime() only for
+-- the fractional sub-second part, preventing long-term timestamp drift.
 -- @return string nanosecond timestamp
 function GTelemetry.OTLP.GetTimeNano()
-    local epochSeconds = _epochOffset + SysTime()
-    -- Convert to nanoseconds: seconds * 1e9
-    -- We use string.format to avoid floating point precision issues
-    return string_format("%.0f", epochSeconds * 1e9)
+    local sysNow = SysTime()
+    local sysFrac = sysNow % 1
+    local epochSeconds = os_time()
+    return string_format("%.0f", (epochSeconds + sysFrac) * 1e9)
 end
 
 --- Create an OTLP attribute object.
@@ -224,6 +226,8 @@ end
 
 --- Collect all metrics from registered collectors, build, and send the payload.
 -- This is the main function called by the collection timer.
+-- The body is wrapped in pcall so _isCollecting is always reset, preventing
+-- the guard from getting stuck permanently on unexpected errors.
 function GTelemetry.OTLP.CollectAndSend()
     if not GTelemetry.Config.IsEnabled() then return end
     if _isCollecting then
@@ -231,36 +235,42 @@ function GTelemetry.OTLP.CollectAndSend()
         return
     end
     _isCollecting = true
-    local startWall = SysTime()
 
-    local allMetrics = {}
-    local collectorCount = 0
+    local ok, err = pcall(function()
+        local startWall = SysTime()
 
-    for name, collector in pairs(GTelemetry.Collectors) do
-        if collector.Collect then
-            local ok, metrics = pcall(collector.Collect)
-            if ok and metrics then
-                for _, metric in ipairs(metrics) do
-                    table_insert(allMetrics, metric)
+        local allMetrics = {}
+        local collectorCount = 0
+
+        for name, collector in pairs(GTelemetry.Collectors) do
+            if collector.Collect then
+                local ok2, metrics = pcall(collector.Collect)
+                if ok2 and metrics then
+                    for _, metric in ipairs(metrics) do
+                        table_insert(allMetrics, metric)
+                    end
+                    collectorCount = collectorCount + 1
+                elseif not ok2 then
+                    GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(metrics))
                 end
-                collectorCount = collectorCount + 1
-            elseif not ok then
-                GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(metrics))
             end
         end
+
+        if #allMetrics == 0 then
+            GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            return
+        end
+
+        GTelemetry.Debug("Collected " .. #allMetrics .. " metrics from " .. collectorCount .. " collectors")
+
+        local jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
+        GTelemetry.OTLP.Send(jsonBody)
+
+        GTelemetry.LastCollectionDuration = SysTime() - startWall
+    end)
+
+    if not ok then
+        GTelemetry.Warn("CollectAndSend failed: " .. tostring(err))
     end
-
-    if #allMetrics == 0 then
-        GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
-        _isCollecting = false
-        return
-    end
-
-    GTelemetry.Debug("Collected " .. #allMetrics .. " metrics from " .. collectorCount .. " collectors")
-
-    local jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
-    GTelemetry.OTLP.Send(jsonBody)
-
-    GTelemetry.LastCollectionDuration = SysTime() - startWall
     _isCollecting = false
 end

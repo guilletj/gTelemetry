@@ -34,6 +34,12 @@ function GTelemetry.Collectors.Network.Init()
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 
+    -- NOTE: These wrappers permanently override net.Start/net.Receive globally.
+    -- Pre-existing net.Receive registrations (before this Init) are NOT counted.
+    -- Also, every net.Start call is counted even if the message is never sent
+    -- (no net.SendToServer / net.Broadcast follows).
+    -- This is a best-effort measurement, not byte-exact accounting.
+
     -- Wrap net.Start to count outgoing messages
     local originalNetStart = net.Start
     net.Start = function(messageName, unreliable)
