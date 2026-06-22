@@ -1,0 +1,163 @@
+--[[
+    gTelemetry: GMod Telemetry
+    sv_config.lua — ConVar definitions & configuration helpers
+
+    All server configuration is managed through ConVars,
+    allowing admins to configure via server.cfg or console.
+]]
+
+GTelemetry.Config = GTelemetry.Config or {}
+
+-- ConVar definitions
+GTelemetry.Config.ConVars = {
+    enabled = CreateConVar(
+        "gtelemetry_enabled", "1",
+        FCVAR_ARCHIVE + FCVAR_NOTIFY,
+        "Enable or disable gTelemetry telemetry collection and export.",
+        0, 1
+    ),
+
+    endpoint = CreateConVar(
+        "gtelemetry_endpoint", "http://localhost:4318/v1/metrics",
+        FCVAR_ARCHIVE + FCVAR_PROTECTED,
+        "The Grafana Alloy OTLP HTTP endpoint URL."
+    ),
+
+    interval = CreateConVar(
+        "gtelemetry_interval", "10",
+        FCVAR_ARCHIVE,
+        "Metrics collection and push interval in seconds.",
+        1, 300
+    ),
+
+    service_name = CreateConVar(
+        "gtelemetry_service_name", "gmod-server",
+        FCVAR_ARCHIVE,
+        "OTLP service.name resource attribute. Used to identify this server in Grafana."
+    ),
+
+    auth_token = CreateConVar(
+        "gtelemetry_auth_token", "",
+        FCVAR_ARCHIVE + FCVAR_PROTECTED,
+        "Optional Bearer token for Alloy authentication. Leave empty to disable."
+    ),
+
+    debug = CreateConVar(
+        "gtelemetry_debug", "0",
+        FCVAR_ARCHIVE,
+        "Enable verbose debug logging to server console.",
+        0, 1
+    ),
+
+    darkrp = CreateConVar(
+        "gtelemetry_darkrp", "1",
+        FCVAR_ARCHIVE,
+        "Enable DarkRP economic metrics (auto-detected).",
+        0, 1
+    ),
+}
+
+--- Returns whether gTelemetry is enabled.
+-- @return boolean
+function GTelemetry.Config.IsEnabled()
+    return GTelemetry.Config.ConVars.enabled:GetBool()
+end
+
+--- Returns the OTLP endpoint URL.
+-- @return string
+function GTelemetry.Config.GetEndpoint()
+    return GTelemetry.Config.ConVars.endpoint:GetString()
+end
+
+--- Returns the collection interval in seconds.
+-- @return number
+function GTelemetry.Config.GetInterval()
+    return GTelemetry.Config.ConVars.interval:GetInt()
+end
+
+--- Returns the service name for OTLP resource attributes.
+-- @return string
+function GTelemetry.Config.GetServiceName()
+    return GTelemetry.Config.ConVars.service_name:GetString()
+end
+
+--- Returns the Bearer auth token, or nil if empty.
+-- @return string|nil
+function GTelemetry.Config.GetAuthToken()
+    local token = GTelemetry.Config.ConVars.auth_token:GetString()
+    if token == "" then return nil end
+    return token
+end
+
+--- Returns whether debug logging is enabled.
+-- @return boolean
+function GTelemetry.Config.IsDebug()
+    return GTelemetry.Config.ConVars.debug:GetBool()
+end
+
+--- Returns whether DarkRP metrics are enabled.
+-- @return boolean
+function GTelemetry.Config.IsDarkRPEnabled()
+    return GTelemetry.Config.ConVars.darkrp:GetBool()
+end
+
+--- Print a debug message to server console (only when debug mode is on).
+-- @param ... any values to print
+function GTelemetry.Debug(...)
+    if not GTelemetry.Config.IsDebug() then return end
+    local args = {...}
+    local parts = {"[gTelemetry DEBUG]"}
+    for _, v in ipairs(args) do
+        table.insert(parts, tostring(v))
+    end
+    print(table.concat(parts, " "))
+end
+
+--- Print an info message to server console.
+-- @param ... any values to print
+function GTelemetry.Log(...)
+    local args = {...}
+    local parts = {"[gTelemetry]"}
+    for _, v in ipairs(args) do
+        table.insert(parts, tostring(v))
+    end
+    print(table.concat(parts, " "))
+end
+
+--- Print a warning message to server console.
+-- @param ... any values to print
+function GTelemetry.Warn(...)
+    local args = {...}
+    local parts = {"[gTelemetry WARNING]"}
+    for _, v in ipairs(args) do
+        table.insert(parts, tostring(v))
+    end
+    MsgC(Color(255, 200, 0), table.concat(parts, " ") .. "\n")
+end
+
+-- Listen for interval changes to recreate the timer
+cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
+    local interval = tonumber(newVal) or 10
+    if interval < 1 then interval = 1 end
+
+    if timer.Exists("GTelemetry_Collect") then
+        timer.Adjust("GTelemetry_Collect", interval)
+        GTelemetry.Log("Collection interval changed to " .. interval .. "s")
+    end
+end, "gtelemetry_interval_change")
+
+-- Listen for enable/disable changes
+cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
+    local enabled = newVal == "1"
+    if enabled then
+        GTelemetry.Log("Telemetry enabled")
+        if GTelemetry.StartCollection then
+            GTelemetry.StartCollection()
+        end
+    else
+        GTelemetry.Log("Telemetry disabled")
+        if timer.Exists("GTelemetry_Collect") then
+            timer.Remove("GTelemetry_Collect")
+        end
+    end
+end, "gtelemetry_enabled_change")
