@@ -180,7 +180,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.players.kills` | Sum | `player.name`, `player.steam_id` | Cumulative kills |
 | `gmod.players.deaths` | Sum | `player.name`, `player.steam_id` | Cumulative deaths |
 | `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (seconds) |
-| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Time from connect to first spawn (seconds) |
+| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Time from connect to client fully loaded (seconds) |
 
 ### Entities (`sv_entities.lua`)
 
