@@ -55,6 +55,20 @@ GTelemetry.Config.ConVars = {
         "Enable DarkRP economic metrics (auto-detected).",
         0, 1
     ),
+
+    entities_per_player = CreateConVar(
+        "gtelemetry_entities_per_player", "1",
+        FCVAR_ARCHIVE,
+        "Enable per-player entity ownership breakdown metrics.",
+        0, 1
+    ),
+
+    network_details = CreateConVar(
+        "gtelemetry_network_details", "0",
+        FCVAR_ARCHIVE,
+        "Enable detailed net message name breakdown metrics (may cause high cardinality).",
+        0, 1
+    ),
 }
 
 --- Returns whether gTelemetry is enabled.
@@ -99,6 +113,18 @@ end
 -- @return boolean
 function GTelemetry.Config.IsDarkRPEnabled()
     return GTelemetry.Config.ConVars.darkrp:GetBool()
+end
+
+--- Returns whether per-player entity breakdown is enabled.
+-- @return boolean
+function GTelemetry.Config.IsEntitiesPerPlayerEnabled()
+    return GTelemetry.Config.ConVars.entities_per_player:GetBool()
+end
+
+--- Returns whether detailed net message breakdown is enabled.
+-- @return boolean
+function GTelemetry.Config.IsNetworkDetailsEnabled()
+    return GTelemetry.Config.ConVars.network_details:GetBool()
 end
 
 --- Print a debug message to server console (only when debug mode is on).
