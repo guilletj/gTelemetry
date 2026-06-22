@@ -200,7 +200,22 @@ end, "gtelemetry_enabled_change")
 
 -- Load user config override after ConVars are registered.
 -- server.cfg runs before autorun, so gtelemetry_* ConVars don't exist yet
--- when server.cfg tries to set them.  This exec catches those overrides.
+-- when server.cfg tries to set them.  This reads the cfg file in Lua
+-- and applies values directly via GetConVar():SetString().
 timer.Simple(0, function()
-    RunConsoleCommand("exec", "gtelemetry.cfg")
+    if not file.Exists("cfg/gtelemetry.cfg", "LUA") then return end
+    local content = file.Read("cfg/gtelemetry.cfg", "LUA")
+    if not content then return end
+    for _, line in ipairs(string.Split(content, "\n")) do
+        line = string.Trim(line)
+        if line == "" or string.match(line, "^//") then continue end
+        local name, value = string.match(line, '^(%S+)%s+"([^"]+)"')
+        if not name then
+            name, value = string.match(line, '^(%S+)%s+(%S+)')
+        end
+        if name and value then
+            local cv = GetConVar(name)
+            if cv then cv:SetString(value) end
+        end
+    end
 end)
