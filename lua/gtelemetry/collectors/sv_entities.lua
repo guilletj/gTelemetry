@@ -127,9 +127,9 @@ function GTelemetry.Collectors.Entities.Collect()
 
         -- Per-player ownership tracking
         if trackPerPlayer then
-            local owner = ent:CPPIGetOwner and ent:CPPIGetOwner()
+            local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
             if not IsValid(owner) then
-                owner = ent:GetCreator and ent:GetCreator()
+                owner = ent.GetCreator and ent:GetCreator()
             end
 
             if IsValid(owner) and owner:IsPlayer() then
