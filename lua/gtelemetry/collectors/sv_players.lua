@@ -2,7 +2,7 @@
     gTelemetry: GMod Telemetry
     collectors/sv_players.lua — Player metrics + client FPS data receiver
 
-    Collects: player count, bots, pings, client FPS, kills, deaths, connection time.
+    Collects: player count, bots, pings, client FPS, kills, deaths, connection time, load time.
     Receives client-side FPS data via the net library.
 ]]
 
@@ -10,7 +10,7 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Players = {}
 
 -- Per-player state tracking
-local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime }
+local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadStart, loadTime }
 local _startTimeNano = nil
 local _initialized = false
 
@@ -28,7 +28,7 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime()}
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = CurTime(), loadTime = nil}
     end
     _playerData[steamID].fps = net.ReadFloat()
 end)
@@ -70,6 +70,8 @@ function GTelemetry.Collectors.Players.Init()
             kills = 0,
             deaths = 0,
             connectTime = CurTime(),
+            loadStart = CurTime(),
+            loadTime = nil,
         }
     end)
 
@@ -77,6 +79,17 @@ function GTelemetry.Collectors.Players.Init()
     hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
         local steamID = ply:SteamID()
         _playerData[steamID] = nil
+    end)
+
+    -- Track load time (PlayerSpawn → first spawn after connect)
+    hook.Add("PlayerSpawn", "GTelemetry_PlayerLoadTime", function(ply)
+        if not IsValid(ply) then return end
+        if ply:IsBot() then return end
+        local steamID = ply:SteamID()
+        local data = _playerData[steamID]
+        if data and not data.loadTime then
+            data.loadTime = math.Round(CurTime() - data.loadStart, 1)
+        end
     end)
 end
 
@@ -95,6 +108,7 @@ function GTelemetry.Collectors.Players.Collect()
     local killPoints = {}
     local deathPoints = {}
     local connectionPoints = {}
+    local loadTimePoints = {}
 
     for _, ply in ipairs(players) do
         if not IsValid(ply) then continue end
@@ -134,6 +148,11 @@ function GTelemetry.Collectors.Players.Collect()
             -- Connection time
             local connTime = CurTime() - data.connectTime
             connectionPoints[#connectionPoints + 1] = MakeDataPoint(math.Round(connTime, 1), attrs)
+
+            -- Load time (reported once, after first spawn)
+            if data.loadTime then
+                loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
+            end
         end
     end
 
@@ -213,6 +232,16 @@ function GTelemetry.Collectors.Players.Collect()
             "Time since player connected",
             "s",
             connectionPoints
+        )
+    end
+
+    -- Load time (time from PlayerInitialSpawn to first PlayerSpawn)
+    if #loadTimePoints > 0 then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.players.load_time",
+            "Time from connect to first spawn",
+            "s",
+            loadTimePoints
         )
     end
 
