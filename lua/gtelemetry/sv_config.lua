@@ -197,3 +197,10 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         end
     end
 end, "gtelemetry_enabled_change")
+
+-- Load user config override after ConVars are registered.
+-- server.cfg runs before autorun, so gtelemetry_* ConVars don't exist yet
+-- when server.cfg tries to set them.  This exec catches those overrides.
+timer.Simple(0, function()
+    RunConsoleCommand("exec", "gtelemetry.cfg")
+end)
