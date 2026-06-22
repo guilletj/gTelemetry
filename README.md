@@ -25,13 +25,18 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
 
 ## Features
 
-- **~50 metrics** across 8 collectors
+- **~55 metrics** across 8 collectors
 - **Zero dependencies** — uses native GMod `HTTP()` function
 - **OTLP standard** — compatible with any OpenTelemetry-compatible backend
 - **DarkRP auto-detection** — economic metrics load automatically when DarkRP is present
 - **Client FPS tracking** — collects client performance data via net library
-- **Configurable** — all settings via server ConVars
-- **Lightweight** — minimal performance impact, async HTTP sends
+- **Admin mod detection** — automatically hooks into ULX, SAM, and FAdmin for command tracking
+- **Entity ownership breakdown** — per-player entity counts grouped by type (configurable)
+- **Network message details** — per-message-name breakdown (configurable, high-cardinality gated)
+- **Configurable** — all settings via server ConVars, runtime reconfiguration without restart
+- **Late-init support** — works even if loaded after map start (e.g., via `lua_openscript`)
+- **Graceful shutdown** — sends final metrics push on server shutdown
+- **Lightweight** — minimal performance impact, async HTTP sends, error-isolated collectors
 
 ## Installation
 
@@ -77,6 +82,9 @@ All configuration is done via server ConVars, either in `server.cfg` or the serv
 | `gtelemetry_auth_token` | *(empty)* | Optional Bearer token for Alloy authentication |
 | `gtelemetry_debug` | `0` | Enable verbose debug logging to server console |
 | `gtelemetry_darkrp` | `1` | Enable DarkRP economic metrics (still requires DarkRP to be installed) |
+| `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
+| `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
+| `gtelemetry_version` | `1.0.0` | Version info (replicated to clients) |
 
 ### Example server.cfg
 
@@ -172,6 +180,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.players.kills` | Sum | `player.name`, `player.steam_id` | Cumulative kills |
 | `gmod.players.deaths` | Sum | `player.name`, `player.steam_id` | Cumulative deaths |
 | `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (seconds) |
+| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Time from connect to first spawn (seconds) |
 
 ### Entities (`sv_entities.lua`)
 
@@ -210,6 +219,8 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.hooks.count` | Gauge | — | Total registered hooks |
 | `gmod.hooks.think_total` | Sum | — | Cumulative Think hook executions since server start |
 | `gmod.hooks.tick_total` | Sum | — | Cumulative Tick hook executions since server start |
+| `gmod.hooks.think_time` | Gauge | — | Time spent in Think hooks last frame (seconds) |
+| `gmod.hooks.tick_time` | Gauge | — | Time spent in Tick hooks last tick (seconds) |
 | `gmod.lua.errors` | Sum | — | Cumulative Lua error count |
 | `gmod.hooks.by_event` | Gauge | `hook.event` | Hooks per event type |
 
