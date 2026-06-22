@@ -13,11 +13,15 @@ GTelemetry.Collectors.Chat = {}
 local _chatMessages = 0
 local _adminCommands = 0
 local _startTimeNano = nil
+local _initialized = false
 
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 
 function GTelemetry.Collectors.Chat.Init()
+    if _initialized then return end
+    _initialized = true
+
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
@@ -37,21 +41,14 @@ function GTelemetry.Collectors.Chat.Init()
         end
     end)
 
-    -- Hook into ULX if available
-    if ulx then
-        hook.Add("ULibCommandCalled", "GTelemetry_ULXTracker", function(ply, cmd, args)
-            _adminCommands = _adminCommands + 1
-        end)
-        GTelemetry.Debug("ULX admin mod detected, tracking admin commands")
-    end
+    -- Hook into ULX/SAM (safe even if events don't exist yet)
+    hook.Add("ULibCommandCalled", "GTelemetry_ULXTracker", function(ply, cmd, args)
+        _adminCommands = _adminCommands + 1
+    end)
 
-    -- Hook into SAM if available
-    if sam then
-        hook.Add("SAM.PlayerCommand", "GTelemetry_SAMTracker", function(ply, cmd, args)
-            _adminCommands = _adminCommands + 1
-        end)
-        GTelemetry.Debug("SAM admin mod detected, tracking admin commands")
-    end
+    hook.Add("SAM.PlayerCommand", "GTelemetry_SAMTracker", function(ply, cmd, args)
+        _adminCommands = _adminCommands + 1
+    end)
 
     GTelemetry.Debug("Chat collector initialized")
 end

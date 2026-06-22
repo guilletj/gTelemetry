@@ -20,6 +20,10 @@ local table_insert = table.insert
 -- os.time() gives epoch seconds, SysTime() gives high-res relative time
 local _epochOffset = os_time() - SysTime()
 
+-- Cooldown counter to avoid console spam on persistent failures
+local _consecutiveFailures = 0
+local _maxFailuresBeforeSkip = 5
+
 --- Returns the current time in nanoseconds since Unix epoch as a string.
 -- OTLP requires timestamps as nanosecond strings.
 -- @return string nanosecond timestamp
@@ -182,6 +186,12 @@ function GTelemetry.OTLP.Send(jsonBody)
         headers["Authorization"] = "Bearer " .. token
     end
 
+    -- Skip sending after persistent failures to avoid console spam
+    if _consecutiveFailures >= _maxFailuresBeforeSkip then
+        GTelemetry.Debug("Skipping send (" .. _consecutiveFailures .. " consecutive failures)")
+        return
+    end
+
     GTelemetry.Debug("Sending metrics to: " .. endpoint .. " (" .. #jsonBody .. " bytes)")
 
     HTTP({
@@ -193,13 +203,16 @@ function GTelemetry.OTLP.Send(jsonBody)
 
         success = function(code, body, respHeaders)
             if code >= 200 and code < 300 then
+                _consecutiveFailures = 0
                 GTelemetry.Debug("Metrics sent successfully (HTTP " .. code .. ")")
             else
+                _consecutiveFailures = _consecutiveFailures + 1
                 GTelemetry.Warn("Alloy returned HTTP " .. code .. ": " .. (body or "no body"))
             end
         end,
 
         failed = function(err)
+            _consecutiveFailures = _consecutiveFailures + 1
             GTelemetry.Warn("Failed to send metrics: " .. tostring(err))
             GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
         end,

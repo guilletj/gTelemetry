@@ -12,6 +12,7 @@ GTelemetry.Collectors.Players = {}
 -- Per-player state tracking
 local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime }
 local _startTimeNano = nil
+local _initialized = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -33,6 +34,8 @@ end)
 
 --- Initialize references and hooks.
 function GTelemetry.Collectors.Players.Init()
+    if _initialized then return end
+    _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
