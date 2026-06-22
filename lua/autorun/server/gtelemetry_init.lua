@@ -36,8 +36,6 @@ function GTelemetry.PrintBanner()
     MsgC(white, "🌐 Web:     ", cyan, "https://alienhost.net\n")
     MsgC(white, "💬 Discord: ", cyan, "https://discord.gg/alienhost\n")
     MsgC(white, "💻 GitHub:  ", cyan, "https://github.com/Edyone\n")
-    MsgC(white, "🎮 Steam:   ", cyan, "https://steamcommunity.com/id/EDYONE_STEAM_PLACEHOLDER\n")
-    MsgC(white, "👤 Discord: ", cyan, "https://discordapp.com/users/EDYONE_DISCORD_PLACEHOLDER\n")
     MsgC(cyan, "==================================================\n\n")
 end
 
@@ -96,6 +94,12 @@ if game.GetMap() and game.GetMap() ~= "" then
         if not timer.Exists("GTelemetry_Collect") and GTelemetry.Config.IsEnabled() then
             GTelemetry.StartCollection()
             GTelemetry.Log("v" .. GTelemetry.Version .. " late-initialized")
+            if GTelemetry.PrintBanner then
+                GTelemetry.PrintBanner()
+            end
+            GTelemetry.Log("Endpoint: " .. GTelemetry.Config.GetEndpoint())
+            GTelemetry.Log("Interval: " .. GTelemetry.Config.GetInterval() .. "s")
+            GTelemetry.Log("Service: " .. GTelemetry.Config.GetServiceName())
         end
     end)
 end

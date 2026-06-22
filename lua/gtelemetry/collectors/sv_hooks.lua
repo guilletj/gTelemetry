@@ -2,7 +2,7 @@
     gTelemetry: GMod Telemetry
     collectors/sv_hooks.lua — Hook performance & error tracking
 
-    Collects: total hook count, Think/Tick execution time, Lua errors,
+    Collects: total hook count, Think/Tick hook call count, Lua errors,
     hook count per event type.
 ]]
 
@@ -10,9 +10,9 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Hooks = {}
 
 -- Performance tracking state
-local _thinkTime = 0      -- Last measured Think hook execution time
-local _tickTime = 0        -- Last measured Tick hook execution time
-local _luaErrors = 0       -- Cumulative Lua error count
+local _thinkCount = 0      -- Cumulative Think hook call count
+local _tickCount = 0        -- Cumulative Tick hook call count
+local _luaErrors = 0        -- Cumulative Lua error count
 local _startTimeNano = nil
 local _initialized = false
 
@@ -21,6 +21,8 @@ local MakeDataPoint = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
+
+local _maxHookCardinality = 20  -- Max unique hook events to report
 
 function GTelemetry.Collectors.Hooks.Init()
     if _initialized then return end
@@ -33,33 +35,14 @@ function GTelemetry.Collectors.Hooks.Init()
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 
-    -- Measure Think hook total time
-    -- We add a high-priority pre/post wrapper around Think
-    local thinkStartTime = 0
-    hook.Add("Think", "GTelemetry_ThinkPre", function()
-        if not GTelemetry.Config.IsEnabled() then return end
-        thinkStartTime = SysTime()
+    -- Count Think executions
+    hook.Add("Think", "GTelemetry_ThinkCounter", function()
+        _thinkCount = _thinkCount + 1
     end)
 
-    -- PostThink-like measurement: use a timer that runs every tick
-    -- to capture the Think hook duration from the previous frame
-    timer.Create("GTelemetry_ThinkMeasure", 0, 0, function()
-        if thinkStartTime > 0 then
-            _thinkTime = SysTime() - thinkStartTime
-        end
-    end)
-
-    -- Measure Tick hook total time
-    local tickStartTime = 0
-    hook.Add("Tick", "GTelemetry_TickPre", function()
-        if not GTelemetry.Config.IsEnabled() then return end
-        tickStartTime = SysTime()
-    end)
-
-    timer.Create("GTelemetry_TickMeasure", engine.TickInterval(), 0, function()
-        if tickStartTime > 0 then
-            _tickTime = SysTime() - tickStartTime
-        end
+    -- Count Tick executions
+    hook.Add("Tick", "GTelemetry_TickCounter", function()
+        _tickCount = _tickCount + 1
     end)
 
     -- Track Lua errors
@@ -67,7 +50,7 @@ function GTelemetry.Collectors.Hooks.Init()
         _luaErrors = _luaErrors + 1
     end)
 
-    GTelemetry.Debug("Hooks collector initialized with Think/Tick profiling")
+    GTelemetry.Debug("Hooks collector initialized")
 end
 
 --- Count total hooks and hooks per event from the hook table.
@@ -106,20 +89,22 @@ function GTelemetry.Collectors.Hooks.Collect()
         {MakeDataPoint(totalHooks)}
     )
 
-    -- Think hook execution time
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.hooks.think_time",
-        "Time spent executing Think hooks",
-        "s",
-        {MakeDataPoint(_thinkTime)}
+    -- Think hook calls (cumulative counter)
+    metrics[#metrics + 1] = MakeSum(
+        "gmod.hooks.think_total",
+        "Cumulative count of Think hook executions since server start",
+        "{calls}",
+        {MakeCumulativeDataPoint(_thinkCount, _startTimeNano)},
+        true
     )
 
-    -- Tick hook execution time
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.hooks.tick_time",
-        "Time spent executing Tick hooks",
-        "s",
-        {MakeDataPoint(_tickTime)}
+    -- Tick hook calls (cumulative counter)
+    metrics[#metrics + 1] = MakeSum(
+        "gmod.hooks.tick_total",
+        "Cumulative count of Tick hook executions since server start",
+        "{calls}",
+        {MakeCumulativeDataPoint(_tickCount, _startTimeNano)},
+        true
     )
 
     -- Lua errors (cumulative counter)
@@ -131,14 +116,20 @@ function GTelemetry.Collectors.Hooks.Collect()
         true
     )
 
-    -- Hooks by event (top events only, to avoid excessive cardinality)
+    -- Hooks by event (limited cardinality)
     local eventPoints = {}
+    local sortedEvents = {}
     for eventName, count in pairs(eventCounts) do
-        if count >= 2 then -- Only report events with 2+ hooks to limit cardinality
-            eventPoints[#eventPoints + 1] = MakeDataPoint(count, {
-                Attribute("hook.event", eventName),
-            })
+        if count >= 2 then
+            sortedEvents[#sortedEvents + 1] = {name = eventName, count = count}
         end
+    end
+    table.sort(sortedEvents, function(a, b) return a.count > b.count end)
+    for i = 1, math.min(#sortedEvents, _maxHookCardinality) do
+        local ev = sortedEvents[i]
+        eventPoints[#eventPoints + 1] = MakeDataPoint(ev.count, {
+            Attribute("hook.event", ev.name),
+        })
     end
 
     if #eventPoints > 0 then

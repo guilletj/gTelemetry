@@ -1,2 +1,6 @@
-.agents/
-AGENTS.md
+*.7z
+*.zip
+*.bak
+*.log
+.DS_Store
+Thumbs.db

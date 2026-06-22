@@ -24,6 +24,9 @@ local _epochOffset = os_time() - SysTime()
 local _consecutiveFailures = 0
 local _maxFailuresBeforeSkip = 5
 
+-- Guard to prevent concurrent collection cycles from stacking
+local _isCollecting = false
+
 --- Returns the current time in nanoseconds since Unix epoch as a string.
 -- OTLP requires timestamps as nanosecond strings.
 -- @return string nanosecond timestamp
@@ -223,6 +226,12 @@ end
 -- This is the main function called by the collection timer.
 function GTelemetry.OTLP.CollectAndSend()
     if not GTelemetry.Config.IsEnabled() then return end
+    if _isCollecting then
+        GTelemetry.Debug("Skipping collection — previous cycle still in progress")
+        return
+    end
+    _isCollecting = true
+    local startWall = SysTime()
 
     local allMetrics = {}
     local collectorCount = 0
@@ -243,6 +252,7 @@ function GTelemetry.OTLP.CollectAndSend()
 
     if #allMetrics == 0 then
         GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+        _isCollecting = false
         return
     end
 
@@ -250,4 +260,7 @@ function GTelemetry.OTLP.CollectAndSend()
 
     local jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
     GTelemetry.OTLP.Send(jsonBody)
+
+    GTelemetry.LastCollectionDuration = SysTime() - startWall
+    _isCollecting = false
 end
