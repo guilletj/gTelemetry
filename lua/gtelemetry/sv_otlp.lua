@@ -144,7 +144,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                         GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.0.0"),
                         GTelemetry.OTLP.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
-                        GTelemetry.OTLP.Attribute("gmod.gamemode", engine.ActiveGamemode and engine.ActiveGamemode() or gmod.GetGamemode().Name or "unknown"),
+                        GTelemetry.OTLP.Attribute("gmod.gamemode", (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"),
                     },
                 },
                 scopeMetrics = {
