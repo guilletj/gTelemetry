@@ -81,17 +81,19 @@ function GTelemetry.Collectors.Players.Init()
         _playerData[steamID] = nil
     end)
 
-    -- Track load time (PlayerSpawn → first spawn after connect)
-    hook.Add("PlayerSpawn", "GTelemetry_PlayerLoadTime", function(ply)
-        if not IsValid(ply) then return end
-        if ply:IsBot() then return end
-        local steamID = ply:SteamID()
-        local data = _playerData[steamID]
-        if data and not data.loadTime then
-            data.loadTime = math.Round(CurTime() - data.loadStart, 1)
-        end
-    end)
 end
+
+-- Track load time (PlayerSpawn → first spawn after connect)
+-- Registered outside Init() to avoid missing the event before lazy init.
+hook.Add("PlayerSpawn", "GTelemetry_PlayerLoadTime", function(ply)
+    if not IsValid(ply) then return end
+    if ply:IsBot() then return end
+    local steamID = ply:SteamID()
+    local data = _playerData[steamID]
+    if data and not data.loadTime then
+        data.loadTime = math.Round(CurTime() - data.loadStart, 2)
+    end
+end)
 
 --- Collect player metrics.
 -- @return table list of OTLP metric objects
