@@ -25,6 +25,13 @@ hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
     GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
 end)
 
+--- Manually increment the map change counter.
+-- Used by the late-init path when InitPostEntity has already fired.
+function GTelemetry.Collectors.Map.CountChange()
+    _mapChanges = _mapChanges + 1
+    GTelemetry.Debug("Map counted externally: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
+end
+
 function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true

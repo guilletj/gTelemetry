@@ -25,6 +25,7 @@ util.AddNetworkString("GTelemetry_ClientData")
 
 net.Receive("GTelemetry_ClientData", function(len, ply)
     if not IsValid(ply) then return end
+    if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime()}
