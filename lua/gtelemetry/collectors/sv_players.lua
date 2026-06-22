@@ -20,17 +20,32 @@ local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
--- Register net message for client FPS data (must be outside Init to avoid race conditions)
+-- Register net messages for client data (must be outside Init to avoid race conditions)
 util.AddNetworkString("GTelemetry_ClientData")
+util.AddNetworkString("GTelemetry_ClientReady")
 
 net.Receive("GTelemetry_ClientData", function(len, ply)
     if not IsValid(ply) then return end
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = CurTime(), loadTime = nil}
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
     end
     _playerData[steamID].fps = net.ReadFloat()
+end)
+
+-- Client signals that its code is loaded and the player is ready to play
+net.Receive("GTelemetry_ClientReady", function(len, ply)
+    if not IsValid(ply) then return end
+    if ply:IsBot() then return end
+    local steamID = ply:SteamID()
+    if not _playerData[steamID] then
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
+    end
+    local data = _playerData[steamID]
+    if data and not data.loadTime then
+        data.loadTime = math.Round(SysTime() - data.loadStart, 2)
+    end
 end)
 
 --- Initialize references and hooks.
@@ -70,7 +85,7 @@ function GTelemetry.Collectors.Players.Init()
             kills = 0,
             deaths = 0,
             connectTime = CurTime(),
-            loadStart = CurTime(),
+            loadStart = SysTime(),
             loadTime = nil,
         }
     end)
@@ -82,18 +97,6 @@ function GTelemetry.Collectors.Players.Init()
     end)
 
 end
-
--- Track load time (PlayerSpawn → first spawn after connect)
--- Registered outside Init() to avoid missing the event before lazy init.
-hook.Add("PlayerSpawn", "GTelemetry_PlayerLoadTime", function(ply)
-    if not IsValid(ply) then return end
-    if ply:IsBot() then return end
-    local steamID = ply:SteamID()
-    local data = _playerData[steamID]
-    if data and not data.loadTime then
-        data.loadTime = math.Round(CurTime() - data.loadStart, 2)
-    end
-end)
 
 --- Collect player metrics.
 -- @return table list of OTLP metric objects
@@ -237,11 +240,11 @@ function GTelemetry.Collectors.Players.Collect()
         )
     end
 
-    -- Load time (time from PlayerInitialSpawn to first PlayerSpawn)
+    -- Load time (time from PlayerInitialSpawn to client-ready signal)
     if #loadTimePoints > 0 then
         metrics[#metrics + 1] = MakeGauge(
             "gmod.players.load_time",
-            "Time from connect to first spawn",
+            "Time from connect to client fully loaded",
             "s",
             loadTimePoints
         )
