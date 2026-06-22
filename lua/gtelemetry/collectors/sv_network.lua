@@ -91,38 +91,40 @@ function GTelemetry.Collectors.Network.Collect()
         true
     )
 
-    -- Net messages sent per name
-    local outPoints = {}
-    for msgName, count in pairs(_netMessagesSentByName) do
-        outPoints[#outPoints + 1] = MakeCumulativeDataPoint(count, _startTimeNano, {
-            GTelemetry.OTLP.Attribute("net.message", msgName)
-        })
-    end
-    if #outPoints > 0 then
-        metrics[#metrics + 1] = MakeSum(
-            "gmod.network.messages_out_details",
-            "Net library messages sent by the server per message name",
-            "{messages}",
-            outPoints,
-            true
-        )
-    end
+    -- Net messages sent per name (high cardinality — gated)
+    if GTelemetry.Config.IsNetworkDetailsEnabled() then
+        local outPoints = {}
+        for msgName, count in pairs(_netMessagesSentByName) do
+            outPoints[#outPoints + 1] = MakeCumulativeDataPoint(count, _startTimeNano, {
+                GTelemetry.OTLP.Attribute("net.message", msgName)
+            })
+        end
+        if #outPoints > 0 then
+            metrics[#metrics + 1] = MakeSum(
+                "gmod.network.messages_out_details",
+                "Net library messages sent by the server per message name",
+                "{messages}",
+                outPoints,
+                true
+            )
+        end
 
-    -- Net messages received per name
-    local inPoints = {}
-    for msgName, count in pairs(_netMessagesReceivedByName) do
-        inPoints[#inPoints + 1] = MakeCumulativeDataPoint(count, _startTimeNano, {
-            GTelemetry.OTLP.Attribute("net.message", msgName)
-        })
-    end
-    if #inPoints > 0 then
-        metrics[#metrics + 1] = MakeSum(
-            "gmod.network.messages_in_details",
-            "Net library messages received by the server per message name",
-            "{messages}",
-            inPoints,
-            true
-        )
+        -- Net messages received per name
+        local inPoints = {}
+        for msgName, count in pairs(_netMessagesReceivedByName) do
+            inPoints[#inPoints + 1] = MakeCumulativeDataPoint(count, _startTimeNano, {
+                GTelemetry.OTLP.Attribute("net.message", msgName)
+            })
+        end
+        if #inPoints > 0 then
+            metrics[#metrics + 1] = MakeSum(
+                "gmod.network.messages_in_details",
+                "Net library messages received by the server per message name",
+                "{messages}",
+                inPoints,
+                true
+            )
+        end
     end
 
     -- Active Net Receivers
