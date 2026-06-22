@@ -21,12 +21,14 @@ local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
+local Attribute = nil
 
 function GTelemetry.Collectors.Network.Init()
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
+    Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 
     -- Wrap net.Start to count outgoing messages
@@ -60,19 +62,6 @@ function GTelemetry.Collectors.Network.Collect()
 
     local metrics = {}
 
-    -- Aggregate per-player network stats
-    local totalBytesIn = 0
-    local totalBytesOut = 0
-
-    for _, ply in ipairs(player.GetAll()) do
-        if IsValid(ply) and not ply:IsBot() then
-            -- Player:PacketLoss() returns 0-100 percentage
-            -- Player:Ping() is in ms (already tracked in players collector)
-            -- There are no direct bytes_in/bytes_out Lua functions per player.
-            -- We use net message count tracking as the best available proxy.
-        end
-    end
-
     -- Net messages sent (server → clients)
     metrics[#metrics + 1] = MakeSum(
         "gmod.network.net_messages_out",
@@ -96,7 +85,7 @@ function GTelemetry.Collectors.Network.Collect()
         local outPoints = {}
         for msgName, count in pairs(_netMessagesSentByName) do
             outPoints[#outPoints + 1] = MakeCumulativeDataPoint(count, _startTimeNano, {
-                GTelemetry.OTLP.Attribute("net.message", msgName)
+                Attribute("net.message", msgName)
             })
         end
         if #outPoints > 0 then
@@ -113,7 +102,7 @@ function GTelemetry.Collectors.Network.Collect()
         local inPoints = {}
         for msgName, count in pairs(_netMessagesReceivedByName) do
             inPoints[#inPoints + 1] = MakeCumulativeDataPoint(count, _startTimeNano, {
-                GTelemetry.OTLP.Attribute("net.message", msgName)
+                Attribute("net.message", msgName)
             })
         end
         if #inPoints > 0 then
@@ -168,8 +157,8 @@ function GTelemetry.Collectors.Network.Collect()
             local loss = ply:PacketLoss()
             if loss > 0 then
                 lossPoints[#lossPoints + 1] = MakeDataPoint(loss, {
-                    GTelemetry.OTLP.Attribute("player.name", ply:Nick()),
-                    GTelemetry.OTLP.Attribute("player.steam_id", ply:SteamID()),
+                    Attribute("player.name", ply:Nick()),
+                    Attribute("player.steam_id", ply:SteamID()),
                 })
             end
         end
