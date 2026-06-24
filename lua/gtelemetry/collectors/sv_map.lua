@@ -20,10 +20,8 @@ local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
--- Register immediately (not inside Init) so it catches InitPostEntity on first load
+-- InitPostEntity fires exactly once per map change; no guard needed.
 hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
-    if _mapCountedThisLoad then return end
-    _mapCountedThisLoad = true
     _mapChanges = _mapChanges + 1
     GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
 end)
