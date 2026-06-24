@@ -22,6 +22,7 @@ local _originalNetReceive = nil
 
 local pairs = pairs
 local ipairs = ipairs
+local math_Round = math.Round
 local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil
@@ -179,7 +180,7 @@ function GTelemetry.Collectors.Network.Collect()
             "gmod.network.packet_loss_avg",
             "Average packet loss percentage across all human players",
             "%",
-            {MakeDataPoint(math.Round(totalLoss / humanCount, 2))}
+            {MakeDataPoint(math_Round(totalLoss / humanCount, 2))}
         )
     end
 

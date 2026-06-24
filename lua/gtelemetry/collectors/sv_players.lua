@@ -16,6 +16,7 @@ local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadSta
 local _startTimeNano = nil
 local _initialized = false
 local _clientLoadTimeout = 120 -- seconds before marking a missing ClientReady as timed out
+local math_Round = math.Round
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -50,7 +51,7 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     end
     local data = _playerData[steamID]
     if data and not data.loadTime then
-        data.loadTime = math.Round(SysTime() - data.loadStart, 2)
+        data.loadTime = math_Round(SysTime() - data.loadStart, 2)
     end
 end)
 
@@ -147,7 +148,7 @@ function GTelemetry.Collectors.Players.Collect()
         if data then
             -- Client FPS (if received)
             if data.fps > 0 then
-                fpsPoints[#fpsPoints + 1] = MakeDataPoint(math.Round(data.fps, 1), attrs)
+                fpsPoints[#fpsPoints + 1] = MakeDataPoint(math_Round(data.fps, 1), attrs)
             end
 
             -- Kills
@@ -158,7 +159,7 @@ function GTelemetry.Collectors.Players.Collect()
 
             -- Connection time
             local connTime = CurTime() - data.connectTime
-            connectionPoints[#connectionPoints + 1] = MakeDataPoint(math.Round(connTime, 1), attrs)
+            connectionPoints[#connectionPoints + 1] = MakeDataPoint(math_Round(connTime, 1), attrs)
 
             -- Load time (reported once, after first spawn)
             if data.loadTime then
@@ -205,7 +206,7 @@ function GTelemetry.Collectors.Players.Collect()
             "gmod.players.ping_avg",
             "Average ping across all human players",
             "ms",
-            {MakeDataPoint(math.Round(totalPing / humanCount, 1))}
+            {MakeDataPoint(math_Round(totalPing / humanCount, 1))}
         )
     end
 

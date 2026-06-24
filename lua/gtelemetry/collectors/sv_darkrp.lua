@@ -12,6 +12,7 @@ GTelemetry.Collectors.DarkRP = {}
 
 local pairs = pairs
 local ipairs = ipairs
+local math_Round = math.Round
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
@@ -110,7 +111,7 @@ function GTelemetry.Collectors.DarkRP.Collect()
             "gmod.darkrp.money_avg",
             "Average money per player",
             "{currency}",
-            {MakeDataPoint(math.Round(totalMoney / humanCount, 2))}
+            {MakeDataPoint(math_Round(totalMoney / humanCount, 2))}
         )
     end
 
