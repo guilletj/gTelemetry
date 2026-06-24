@@ -9,6 +9,8 @@
 GTelemetry.Config = GTelemetry.Config or {}
 
 local table_insert = table.insert
+local table_concat = table_concat
+local string_match = string.match
 
 -- ConVar definitions
 GTelemetry.Config.ConVars = {
@@ -98,7 +100,7 @@ function GTelemetry.Config.GetEndpoint()
     local url = GTelemetry.Config.ConVars.endpoint:GetString()
     if url == "" then
         GTelemetry.Warn("No endpoint configured. Set gtelemetry_endpoint ConVar.")
-    elseif not string.match(url, "^https?://") then
+    elseif not string_match(url, "^https?://") then
         GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
     end
     return url
@@ -163,7 +165,7 @@ function GTelemetry.Debug(...)
     for _, v in ipairs(args) do
         table_insert(parts, tostring(v))
     end
-    print(table.concat(parts, " "))
+    print(table_concat(parts, " "))
 end
 
 --- Print an info message to server console.
@@ -174,7 +176,7 @@ function GTelemetry.Log(...)
     for _, v in ipairs(args) do
         table_insert(parts, tostring(v))
     end
-    print(table.concat(parts, " "))
+    print(table_concat(parts, " "))
 end
 
 --- Print a warning message to server console.
@@ -186,9 +188,9 @@ function GTelemetry.Warn(...)
         table_insert(parts, tostring(v))
     end
     if Color then
-        MsgC(Color(255, 200, 0), table.concat(parts, " ") .. "\n")
+        MsgC(Color(255, 200, 0), table_concat(parts, " ") .. "\n")
     else
-        print(table.concat(parts, " "))
+        print(table_concat(parts, " "))
     end
 end
 

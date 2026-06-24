@@ -16,6 +16,7 @@ local _startTimeNano = nil
 local _initialized = false
 local math_floor = math.floor
 local math_Round = math.Round
+local math_min = math.min
 
 --- Initialize references (called after OTLP module is loaded).
 function GTelemetry.Collectors.Server.Init()
@@ -36,6 +37,7 @@ function GTelemetry.Collectors.Server.Collect()
     local metrics = {}
     local tickInterval = engine.TickInterval()
     local frameTime = FrameTime()
+    local curTime = CurTime()
 
     -- Tick rate (configured)
     metrics[#metrics + 1] = MakeGauge(
@@ -75,7 +77,7 @@ function GTelemetry.Collectors.Server.Collect()
     -- Server FPS (derived from frame time, clamped to avoid infinity)
     local serverFPS = 0
     if frameTime > 0 then
-        serverFPS = math.min(1 / frameTime, 1000)
+        serverFPS = math_min(1 / frameTime, 1000)
     end
     metrics[#metrics + 1] = MakeGauge(
         "gmod.server.fps",
@@ -98,7 +100,7 @@ function GTelemetry.Collectors.Server.Collect()
         "gmod.server.uptime",
         "Server uptime since map load",
         "s",
-        {MakeDataPoint(math_Round(CurTime(), 1))}
+        {MakeDataPoint(math_Round(curTime, 1))}
     )
 
     -- Max players

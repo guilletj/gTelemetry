@@ -65,11 +65,15 @@ function GTelemetry.OTLP.Attribute(key, value)
     local otlpValue
 
     if valType == "number" then
-        -- Check if integer or float
-        if value == value and value == math_floor(value) then
-            otlpValue = {intValue = tostring(value)}
+        -- Check if finite, then if integer or float
+        if value < math.huge and value > -math.huge then
+            if value == math_floor(value) then
+                otlpValue = {intValue = tostring(value)}
+            else
+                otlpValue = {doubleValue = value}
+            end
         else
-            otlpValue = {doubleValue = value}
+            otlpValue = {stringValue = tostring(value)}
         end
     elseif valType == "boolean" then
         otlpValue = {boolValue = value}
@@ -90,11 +94,15 @@ function GTelemetry.OTLP.MakeDataPoint(value, attributes)
         timeUnixNano = timeNano,
     }
 
-    -- Set value type
-    if value == value and value == math_floor(value) and value < 1e15 and value > -1e15 then
-        dp.asInt = tostring(value)
+    -- Set value type (NaN/Inf fall back to int = 0 for JSON safety)
+    if value < math.huge and value > -math.huge then
+        if value == math_floor(value) and value < 1e15 and value > -1e15 then
+            dp.asInt = tostring(value)
+        else
+            dp.asDouble = value
+        end
     else
-        dp.asDouble = value
+        dp.asInt = "0"
     end
 
     if attributes and #attributes > 0 then
