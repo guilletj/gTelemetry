@@ -122,6 +122,8 @@ function GTelemetry.Collectors.Players.Collect()
     local connectionPoints = {}
     local loadTimePoints = {}
 
+    local curTime = CurTime()
+
     for _, ply in ipairs(players) do
         if not IsValid(ply) then continue end
 
@@ -158,7 +160,7 @@ function GTelemetry.Collectors.Players.Collect()
             deathPoints[#deathPoints + 1] = MakeCumulativeDataPoint(data.deaths, _startTimeNano, attrs)
 
             -- Connection time
-            local connTime = CurTime() - data.connectTime
+            local connTime = curTime - data.connectTime
             connectionPoints[#connectionPoints + 1] = MakeDataPoint(math_Round(connTime, 1), attrs)
 
             -- Load time (reported once, after first spawn)
@@ -166,7 +168,7 @@ function GTelemetry.Collectors.Players.Collect()
                 if data.loadTime > 0 then
                     loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
                 end
-            elseif CurTime() - data.connectTime > _clientLoadTimeout then
+            elseif curTime - data.connectTime > _clientLoadTimeout then
                 data.loadTime = -1
                 GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
             end

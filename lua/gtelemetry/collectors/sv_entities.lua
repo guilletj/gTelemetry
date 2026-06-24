@@ -115,7 +115,7 @@ function GTelemetry.Collectors.Entities.Collect()
     -- Skip collection per gtelemetry_entities_interval to reduce CPU on large maps
     local skipEvery = GTelemetry.Config.GetEntitiesInterval()
     if skipEvery > 1 then
-        _cycleCount = _cycleCount + 1
+        _cycleCount = (_cycleCount + 1) % (skipEvery * 1000)
         if _cycleCount % skipEvery ~= 0 then
             return nil
         end
