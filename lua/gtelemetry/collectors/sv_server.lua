@@ -10,11 +10,20 @@ GTelemetry.Collectors.Server = {}
 
 local MakeGauge = nil
 local MakeDataPoint = nil
+local MakeSum = nil
+local MakeCumulativeDataPoint = nil
+local _startTimeNano = nil
+local _initialized = false
 
 --- Initialize references (called after OTLP module is loaded).
 function GTelemetry.Collectors.Server.Init()
+    if _initialized then return end
+    _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
+    MakeSum = GTelemetry.OTLP.MakeSum
+    MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
+    _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 end
 
 --- Collect server performance metrics.
@@ -104,6 +113,24 @@ function GTelemetry.Collectors.Server.Collect()
             {MakeDataPoint(GTelemetry.LastCollectionDuration)}
         )
     end
+
+    -- Cumulative collector errors (from sv_otlp)
+    metrics[#metrics + 1] = MakeSum(
+        "gmod.telemetry.collection_errors",
+        "Cumulative number of collector errors since server start",
+        "{errors}",
+        {MakeCumulativeDataPoint(GTelemetry.OTLP.CollectionErrors or 0, _startTimeNano)},
+        true
+    )
+
+    -- Cumulative send failures (from sv_otlp)
+    metrics[#metrics + 1] = MakeSum(
+        "gmod.telemetry.send_failures",
+        "Cumulative number of HTTP send failures since server start",
+        "{failures}",
+        {MakeCumulativeDataPoint(GTelemetry.OTLP.SendFailures or 0, _startTimeNano)},
+        true
+    )
 
     return metrics
 end

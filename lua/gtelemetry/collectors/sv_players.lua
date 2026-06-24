@@ -13,6 +13,7 @@ GTelemetry.Collectors.Players = {}
 local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadStart, loadTime }
 local _startTimeNano = nil
 local _initialized = false
+local _clientLoadTimeout = 120 -- seconds before marking a missing ClientReady as timed out
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -31,7 +32,10 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
     if not _playerData[steamID] then
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
     end
-    _playerData[steamID].fps = net.ReadFloat()
+    local fps = net.ReadFloat()
+    if fps then
+        _playerData[steamID].fps = fps
+    end
 end)
 
 -- Client signals that its code is loaded and the player is ready to play
@@ -80,7 +84,7 @@ function GTelemetry.Collectors.Players.Init()
     -- Track player connections
     hook.Add("PlayerInitialSpawn", "GTelemetry_PlayerConnect", function(ply)
         local steamID = ply:SteamID()
-        _playerData[steamID] = {
+        _playerData[steamID] = _playerData[steamID] or {
             fps = 0,
             kills = 0,
             deaths = 0,
@@ -156,7 +160,12 @@ function GTelemetry.Collectors.Players.Collect()
 
             -- Load time (reported once, after first spawn)
             if data.loadTime then
-                loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
+                if data.loadTime > 0 then
+                    loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
+                end
+            elseif CurTime() - data.connectTime > _clientLoadTimeout then
+                data.loadTime = -1
+                GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
             end
         end
     end

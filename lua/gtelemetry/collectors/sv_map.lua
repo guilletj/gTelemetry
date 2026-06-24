@@ -10,7 +10,7 @@ GTelemetry.Collectors.Map = {}
 
 -- Track map changes
 local _mapChanges = 0
-local _startTimeNano = nil
+local _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 local _initialized = false
 
 local MakeGauge = nil
@@ -40,7 +40,6 @@ function GTelemetry.Collectors.Map.Init()
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
-    _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 end
 
 --- Collect map and server info metrics.

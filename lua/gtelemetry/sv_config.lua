@@ -8,6 +8,8 @@
 
 GTelemetry.Config = GTelemetry.Config or {}
 
+local table_insert = table.insert
+
 -- ConVar definitions
 GTelemetry.Config.ConVars = {
     enabled = CreateConVar(
@@ -87,7 +89,9 @@ end
 -- @return string
 function GTelemetry.Config.GetEndpoint()
     local url = GTelemetry.Config.ConVars.endpoint:GetString()
-    if url ~= "" and not string.match(url, "^https?://") then
+    if url == "" then
+        GTelemetry.Warn("No endpoint configured. Set gtelemetry_endpoint ConVar.")
+    elseif not string.match(url, "^https?://") then
         GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
     end
     return url
@@ -144,7 +148,7 @@ function GTelemetry.Debug(...)
     local args = {...}
     local parts = {"[gTelemetry DEBUG]"}
     for _, v in ipairs(args) do
-        table.insert(parts, tostring(v))
+        table_insert(parts, tostring(v))
     end
     print(table.concat(parts, " "))
 end
@@ -155,7 +159,7 @@ function GTelemetry.Log(...)
     local args = {...}
     local parts = {"[gTelemetry]"}
     for _, v in ipairs(args) do
-        table.insert(parts, tostring(v))
+        table_insert(parts, tostring(v))
     end
     print(table.concat(parts, " "))
 end
@@ -166,7 +170,7 @@ function GTelemetry.Warn(...)
     local args = {...}
     local parts = {"[gTelemetry WARNING]"}
     for _, v in ipairs(args) do
-        table.insert(parts, tostring(v))
+        table_insert(parts, tostring(v))
     end
     MsgC(Color(255, 200, 0), table.concat(parts, " ") .. "\n")
 end
@@ -182,18 +186,34 @@ cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
     end
 end, "gtelemetry_interval_change")
 
+-- Listen for network details toggle
+cvars.AddChangeCallback("gtelemetry_network_details", function(_, _, newVal)
+    if newVal == "1" then
+        GTelemetry.Log("Network details enabled (may increase metric cardinality)")
+    else
+        GTelemetry.Log("Network details disabled")
+    end
+end, "gtelemetry_network_details_change")
+
 -- Listen for enable/disable changes
 cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
     local enabled = newVal == "1"
     if enabled then
         GTelemetry.Log("Telemetry enabled")
-        if GTelemetry.StartCollection and not timer.Exists("GTelemetry_Collect") then
-            GTelemetry.StartCollection()
+        if GTelemetry.StartCollection then
+            if not timer.Exists("GTelemetry_Collect") then
+                GTelemetry.StartCollection()
+            end
+        else
+            GTelemetry.Warn("GTelemetry.StartCollection not available yet (modules still loading)")
         end
     else
         GTelemetry.Log("Telemetry disabled")
         if timer.Exists("GTelemetry_Collect") then
             timer.Remove("GTelemetry_Collect")
+        end
+        if GTelemetry.Collectors.Network and GTelemetry.Collectors.Network.Undo then
+            GTelemetry.Collectors.Network.Undo()
         end
     end
 end, "gtelemetry_enabled_change")
