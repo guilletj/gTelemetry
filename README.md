@@ -36,7 +36,8 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
 - **Configurable** — all settings via server ConVars, runtime reconfiguration without restart
 - **Late-init support** — works even if loaded after map start (e.g., via `lua_openscript`)
 - **Graceful shutdown** — sends final metrics push on server shutdown
-- **Lightweight** — minimal performance impact, async HTTP sends, error-isolated collectors
+- **Lightweight** — minimal performance impact, async HTTP sends, error-isolated collectors, configurable entity scan interval
+- **Resilient** — exponential backoff on HTTP failures (up to 2 minutes), health metrics for pipeline monitoring
 
 ## Installation
 
@@ -83,6 +84,7 @@ All configuration is done via server ConVars, either in `server.cfg` or the serv
 | `gtelemetry_debug` | `0` | Enable verbose debug logging to server console |
 | `gtelemetry_darkrp` | `1` | Enable DarkRP economic metrics (still requires DarkRP to be installed) |
 | `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
+| `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle, 2 = every other, etc.). Higher values reduce CPU on large maps |
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
 | `gtelemetry_version` | `1.0.0` | Version info (replicated to clients) |
 
@@ -166,6 +168,8 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.server.uptime` | Gauge | Server uptime since map load (seconds) |
 | `gmod.server.max_players` | Gauge | Maximum player slots |
 | `gmod.telemetry.active` | Gauge | Indicates gTelemetry is active and collecting (always 1) |
+| `gmod.telemetry.collection_errors` | Sum | Cumulative number of collector errors since server start |
+| `gmod.telemetry.send_failures` | Sum | Cumulative number of HTTP send failures since server start |
 | `gmod.server.collection_duration` | Gauge | Time spent collecting and sending metrics in the last cycle (seconds) |
 
 ### Players (`sv_players.lua`)
@@ -180,7 +184,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.players.kills` | Sum | `player.name`, `player.steam_id` | Cumulative kills |
 | `gmod.players.deaths` | Sum | `player.name`, `player.steam_id` | Cumulative deaths |
 | `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (seconds) |
-| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Time from connect to client fully loaded (seconds) |
+| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Time from connect to client fully loaded (seconds). `-1` if client never reported ready within 120s timeout |
 
 ### Entities (`sv_entities.lua`)
 
@@ -272,7 +276,8 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 ### High CPU usage
 
 - Increase the collection interval: `gtelemetry_interval 30`
-- The addon is designed to be lightweight, but on very large servers (64+ players) with many entities, consider increasing the interval.
+- Reduce entity scan frequency: `gtelemetry_entities_interval 5` (scan only every 5th cycle)
+- On very large servers (64+ players) with 10,000+ entities, the entity collector is the most expensive. Use `gtelemetry_entities_interval` to reduce its impact.
 
 ### Authentication errors
 

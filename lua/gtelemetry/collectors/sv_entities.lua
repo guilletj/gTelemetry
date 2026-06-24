@@ -11,6 +11,8 @@ GTelemetry.Collectors.Entities = {}
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
+local _initialized = false
+local _cycleCount = 0
 
 -- Entity type classification constants
 local ENTITY_PROPS = 1
@@ -32,6 +34,14 @@ local _noPhysicsPrefix = {
     path_ = true,
     logic_ = true,
     ai_ = true,
+    trigger_ = true,
+    func_ = true,
+    item_ = true,
+    math_ = true,
+    scene_ = true,
+    shadow_ = true,
+    sprite_ = true,
+    light_ = true,
 }
 
 --- Classify an entity into a numeric type.
@@ -87,6 +97,8 @@ local function TypeName(t)
 end
 
 function GTelemetry.Collectors.Entities.Init()
+    if _initialized then return end
+    _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
@@ -96,6 +108,15 @@ end
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Entities.Collect()
     if not MakeGauge then GTelemetry.Collectors.Entities.Init() end
+
+    -- Skip collection per gtelemetry_entities_interval to reduce CPU on large maps
+    local skipEvery = GTelemetry.Config.GetEntitiesInterval()
+    if skipEvery > 1 then
+        _cycleCount = _cycleCount + 1
+        if _cycleCount % skipEvery ~= 0 then
+            return nil
+        end
+    end
 
     local metrics = {}
     local allEnts = ents.GetAll()

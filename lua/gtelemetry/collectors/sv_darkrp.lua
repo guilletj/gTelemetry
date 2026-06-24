@@ -13,8 +13,11 @@ GTelemetry.Collectors.DarkRP = {}
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
+local _initialized = false
 
 function GTelemetry.Collectors.DarkRP.Init()
+    if _initialized then return end
+    _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
