@@ -17,6 +17,8 @@ local _netMessagesSentByName = {}
 local _netMessagesReceivedByName = {}
 local _startTimeNano = nil
 local _initialized = false
+local _originalNetStart = nil
+local _originalNetReceive = nil
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -41,20 +43,20 @@ function GTelemetry.Collectors.Network.Init()
     -- This is a best-effort measurement, not byte-exact accounting.
 
     -- Wrap net.Start to count outgoing messages
-    local originalNetStart = net.Start
+    _originalNetStart = net.Start
     net.Start = function(messageName, unreliable)
         _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)
         _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
-        return originalNetStart(messageName, unreliable)
+        return _originalNetStart(messageName, unreliable)
     end
 
     -- Track incoming messages via a hook on net.Receive registrations
     -- We increment a counter each time any net message is received
-    local originalNetReceive = net.Receive
+    _originalNetReceive = net.Receive
     net.Receive = function(messageName, callback)
         local msgStr = tostring(messageName)
-        return originalNetReceive(messageName, function(len, ply)
+        return _originalNetReceive(messageName, function(len, ply)
             _netMessagesReceived = _netMessagesReceived + 1
             _netMessagesReceivedByName[msgStr] = (_netMessagesReceivedByName[msgStr] or 0) + 1
             return callback(len, ply)
@@ -62,6 +64,26 @@ function GTelemetry.Collectors.Network.Init()
     end
 
     GTelemetry.Debug("Network collector initialized with net.Start/Receive wrappers")
+end
+
+--- Restore original net.Start/net.Receive and reset counters.
+function GTelemetry.Collectors.Network.Undo()
+    if _originalNetStart then net.Start = _originalNetStart end
+    if _originalNetReceive then net.Receive = _originalNetReceive end
+    _netMessagesSent = 0
+    _netMessagesReceived = 0
+    _netMessagesSentByName = {}
+    _netMessagesReceivedByName = {}
+    _startTimeNano = nil
+    _initialized = false
+    _originalNetStart = nil
+    _originalNetReceive = nil
+    MakeGauge = nil
+    MakeDataPoint = nil
+    MakeSum = nil
+    MakeCumulativeDataPoint = nil
+    Attribute = nil
+    GTelemetry.Debug("Network collector wrappers restored")
 end
 
 --- Collect network metrics.

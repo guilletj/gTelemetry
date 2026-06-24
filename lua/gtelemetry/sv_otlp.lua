@@ -20,9 +20,14 @@ local table_insert = table.insert
 -- SysTime() gives high-res time, used only for fractional seconds
 -- This avoids drift between SysTime() and wall clock over long uptimes
 
--- Cooldown counter to avoid console spam on persistent failures
-local _consecutiveFailures = 0
-local _maxFailuresBeforeSkip = 5
+-- Health counters exposed to sv_server for metric emission
+GTelemetry.OTLP.CollectionErrors = 0
+GTelemetry.OTLP.SendFailures = 0
+
+-- Exponential backoff for HTTP retries
+local _backoffAttempts = 0
+local _nextSendTime = 0
+local _maxBackoff = 120
 
 -- Guard to prevent concurrent collection cycles from stacking
 local _isCollecting = false
@@ -177,7 +182,6 @@ end
 function GTelemetry.OTLP.Send(jsonBody)
     local endpoint = GTelemetry.Config.GetEndpoint()
     if not endpoint or endpoint == "" then
-        GTelemetry.Warn("No endpoint configured. Set gtelemetry_endpoint ConVar.")
         return
     end
 
@@ -191,9 +195,9 @@ function GTelemetry.OTLP.Send(jsonBody)
         headers["Authorization"] = "Bearer " .. token
     end
 
-    -- Skip sending after persistent failures to avoid console spam
-    if _consecutiveFailures >= _maxFailuresBeforeSkip then
-        GTelemetry.Debug("Skipping send (" .. _consecutiveFailures .. " consecutive failures)")
+    -- Exponential backoff: skip if still in cooldown window
+    if SysTime() < _nextSendTime then
+        GTelemetry.Debug("Skipping send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
         return
     end
 
@@ -208,16 +212,21 @@ function GTelemetry.OTLP.Send(jsonBody)
 
         success = function(code, body, respHeaders)
             if code >= 200 and code < 300 then
-                _consecutiveFailures = 0
+                _backoffAttempts = 0
+                _nextSendTime = 0
                 GTelemetry.Debug("Metrics sent successfully (HTTP " .. code .. ")")
             else
-                _consecutiveFailures = _consecutiveFailures + 1
+                _backoffAttempts = _backoffAttempts + 1
+                _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
+                GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
                 GTelemetry.Warn("Alloy returned HTTP " .. code .. ": " .. (body or "no body"))
             end
         end,
 
         failed = function(err)
-            _consecutiveFailures = _consecutiveFailures + 1
+            _backoffAttempts = _backoffAttempts + 1
+            _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
+            GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
             GTelemetry.Warn("Failed to send metrics: " .. tostring(err))
             GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
         end,
@@ -244,14 +253,15 @@ function GTelemetry.OTLP.CollectAndSend()
 
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
-                local ok2, metrics = pcall(collector.Collect)
-                if ok2 and metrics then
-                    for _, metric in ipairs(metrics) do
+                local ok2, result = pcall(collector.Collect)
+                if ok2 and result then
+                    for _, metric in ipairs(result) do
                         table_insert(allMetrics, metric)
                     end
                     collectorCount = collectorCount + 1
                 elseif not ok2 then
-                    GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(metrics))
+                    GTelemetry.OTLP.CollectionErrors = GTelemetry.OTLP.CollectionErrors + 1
+                    GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(result))
                 end
             end
         end

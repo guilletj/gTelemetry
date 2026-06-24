@@ -26,19 +26,9 @@ function GTelemetry.Collectors.Chat.Init()
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 
-    -- Track chat messages
+    -- Track chat messages (admin commands are tracked via admin mod hooks below)
     hook.Add("PlayerSay", "GTelemetry_ChatTracker", function(ply, text, teamOnly)
         _chatMessages = _chatMessages + 1
-
-        -- Detect admin commands by prefix
-        -- Common admin command prefixes: !, /, @
-        if string.StartWith(text, "!") or string.StartWith(text, "/") or string.StartWith(text, "@") then
-            -- Check if this looks like an admin command (not just a regular message)
-            local firstWord = string.match(text, "^[!/@](%w+)")
-            if firstWord and #firstWord >= 2 then
-                _adminCommands = _adminCommands + 1
-            end
-        end
     end)
 
     -- Hook into ULX/SAM (safe even if events don't exist yet)

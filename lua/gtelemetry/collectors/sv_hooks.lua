@@ -25,6 +25,7 @@ local MakeDataPoint = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
+local table_sort = table.sort
 
 local _maxHookCardinality = 20  -- Max unique hook events to report
 
@@ -156,7 +157,7 @@ function GTelemetry.Collectors.Hooks.Collect()
             sortedEvents[#sortedEvents + 1] = {name = eventName, count = count}
         end
     end
-    table.sort(sortedEvents, function(a, b) return a.count > b.count end)
+    table_sort(sortedEvents, function(a, b) return a.count > b.count end)
     for i = 1, math.min(#sortedEvents, _maxHookCardinality) do
         local ev = sortedEvents[i]
         eventPoints[#eventPoints + 1] = MakeDataPoint(ev.count, {

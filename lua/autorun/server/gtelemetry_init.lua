@@ -21,22 +21,28 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 
 --- Prints a stylized startup banner for the telemetry addon.
 function GTelemetry.PrintBanner()
-    local cyan = Color(0, 255, 255)
-    local purple = Color(180, 100, 255)
-    -- Color() is a GMod global. In some environments it might not exist if run outside GMod (e.g. tests), so handle gracefully.
-    if not Color then return end
-    local white = Color(240, 240, 240)
-    local gray = Color(150, 150, 150)
-    local yellow = Color(255, 215, 0)
+    if Color then
+        local cyan = Color(0, 255, 255)
+        local purple = Color(180, 100, 255)
+        local white = Color(240, 240, 240)
+        local gray = Color(150, 150, 150)
+        local yellow = Color(255, 215, 0)
 
-    MsgC(cyan, "\n==================================================\n")
-    MsgC(cyan, "[gTelemetry] ", purple, "GMod Telemetry (v" .. (GTelemetry.Version or "1.0.0") .. ")\n")
-    MsgC(white, "Desarrollado por: ", yellow, "Edyone ", white, "para ", cyan, "Alienhost\n")
-    MsgC(gray, "--------------------------------------------------\n")
-    MsgC(white, "🌐 Web:     ", cyan, "https://alienhost.net\n")
-    MsgC(white, "💬 Discord: ", cyan, "https://discord.gg/alienhost\n")
-    MsgC(white, "💻 GitHub:  ", cyan, "https://github.com/Edyone\n")
-    MsgC(cyan, "==================================================\n\n")
+        MsgC(cyan, "\n==================================================\n")
+        MsgC(cyan, "[gTelemetry] ", purple, "GMod Telemetry (v" .. GTelemetry.Version .. ")\n")
+        MsgC(white, "Desarrollado por: ", yellow, "Edyone ", white, "para ", cyan, "Alienhost\n")
+        MsgC(gray, "--------------------------------------------------\n")
+        MsgC(white, "🌐 Web:     ", cyan, "https://alienhost.net\n")
+        MsgC(white, "💬 Discord: ", cyan, "https://discord.gg/alienhost\n")
+        MsgC(white, "💻 GitHub:  ", cyan, "https://github.com/Edyone\n")
+        MsgC(cyan, "==================================================\n\n")
+    else
+        local sep = string.rep("=", 50)
+        print(sep)
+        print("[gTelemetry] GMod Telemetry (v" .. GTelemetry.Version .. ")")
+        print("Desarrollado por: Edyone para Alienhost")
+        print(sep)
+    end
 end
 
 -- Load core modules
