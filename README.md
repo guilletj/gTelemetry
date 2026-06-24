@@ -87,7 +87,7 @@ All configuration is done via server ConVars, either in `server.cfg` or the serv
 | `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
 | `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle, 2 = every other, etc.). Higher values reduce CPU on large maps |
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
-| `gtelemetry_version` | `1.0.0` | Version info (replicated to clients) |
+| `gtelemetry_version` | `1.1.0` | Version info (replicated to clients) |
 
 ### How intervals work
 
