@@ -4,7 +4,7 @@
 
 ## Core log collectors (`gtelemetry_log_blogs_mode = "off"`)
 
-Uses `sv_log_events.lua` — hooks 28 events directly via `hook.Add()`.
+Uses `sv_log_events.lua` — hooks 29 events directly via `hook.Add()`.
 
 | Event | Severity | Body format | Attributes |
 |-------|----------|-------------|------------|

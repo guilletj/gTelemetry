@@ -172,6 +172,10 @@ function GTelemetry.OTLP.BuildPayload(metrics)
     local currentMap = game.GetMap() or "unknown"
     local serviceName = GTelemetry.Config.GetServiceName()
 
+    if not _cachedGamemode then
+        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
+    end
+
     local payload = {
         resourceMetrics = {
             {
@@ -181,9 +185,6 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                         GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.0"),
                         GTelemetry.OTLP.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
-                        if not _cachedGamemode then
-                            _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
-                        end
                         GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
                     },
                 },
