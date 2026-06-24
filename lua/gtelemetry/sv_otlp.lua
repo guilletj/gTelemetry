@@ -22,9 +22,10 @@ local pairs = pairs
 local ipairs = ipairs
 local math_floor = math.floor
 
--- Capture SysTime at module load to align with os.time() epoch.
--- This eliminates the ±1s jitter from misaligned integer-second boundaries.
+-- Capture SysTime and os.time at module load to compute accurate Unix time
+-- without drifting into the future: epoch = _epochAtLoad + (SysTime() - _sysTimeStart)
 local _sysTimeStart = SysTime()
+local _epochAtLoad = os_time()
 
 -- Health counters exposed to sv_server for metric emission
 GTelemetry.OTLP.CollectionErrors = 0
@@ -36,7 +37,7 @@ GTelemetry.OTLP._cycleTimeNano = nil
 -- Exponential backoff for HTTP retries
 local _backoffAttempts = 0
 local _nextSendTime = 0
-local _maxBackoff = 120
+local _maxBackoff = 30
 local _cachedGamemode = nil
 
 -- Reset gamemode cache when the gamemode changes
@@ -49,12 +50,12 @@ local _isCollecting = false
 
 --- Returns the current time in nanoseconds since Unix epoch as a string.
 -- OTLP requires timestamps as nanosecond strings.
--- Uses os.time() for whole seconds (no drift) and SysTime() only for
--- the fractional sub-second part, preventing long-term timestamp drift.
+-- Uses _epochAtLoad captured at module load to avoid drifting into the future.
+-- SysTime() only provides the fractional sub-second offset.
 -- @return string nanosecond timestamp
 function GTelemetry.OTLP.GetTimeNano()
     local now = SysTime()
-    local epochSeconds = os_time() + (now - _sysTimeStart)
+    local epochSeconds = _epochAtLoad + (now - _sysTimeStart)
     return string_format("%.0f", epochSeconds * 1e9)
 end
 

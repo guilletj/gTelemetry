@@ -31,7 +31,7 @@ GTelemetry.OTLP.Logs.DroppedLogs = 0
 
 local _backoffAttempts = 0
 local _nextSendTime = 0
-local _maxBackoff = 120
+local _maxBackoff = 30
 local _isFlushing = false
 local _cachedGamemode = nil
 
