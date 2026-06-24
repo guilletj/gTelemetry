@@ -15,6 +15,7 @@ GMod server **must** be started with `-allowlocalhttp` for HTTP to private/local
 - `cl_` prefix → client-side files
 - Entry point: `lua/autorun/server/gtelemetry_init.lua` (loads all modules)
 - Collectors: `lua/gtelemetry/collectors/sv_*.lua`
+- Client file: `lua/autorun/client/cl_gtelemetry.lua` (sends FPS every 5s via net messages)
 
 ## Architecture
 
@@ -27,6 +28,14 @@ GMod server **must** be started with `-allowlocalhttp` for HTTP to private/local
 - ~59 metrics, all prefixed `gmod.`
 - Config via ConVars (`gtelemetry_*`) — no config files
 - 8 collectors: Server, Players, Entities, Network, Hooks, Map, Chat, DarkRP
+
+## GMod threading model
+
+- Single Lua state, everything synchronous
+- No coroutines, no preemption — hooks and timers run sequentially in the same state
+- `HTTP()` callbacks are asynchronous but return to the same state (no race conditions on shared data)
+- `include()` re-executes the entire file, resetting all top-level `local` variables
+- **Map changes do NOT reset the Lua state** — module-level `local` variables persist across maps
 
 ## No standard dev tooling
 
@@ -55,3 +64,17 @@ Deploy by copying the addon to `garrysmod/addons/` and restarting the server.
 - Gamemode health check: `engine.ActiveGamemode()` → `_cachedGamemode`, reset on `gamemode.PostGamemodeLoaded`
 - Color-safe logging: `Warn()` nil-checks `Color()` before calling it
 - Module-level caching of `string.match`, `string.StartWith`, `table.concat`, `math.floor`, `math.Round`, `math.min` for hot-path performance
+
+## What NOT to cache
+
+These look cacheable but are NOT safe — they change at runtime or depend on dynamic state:
+
+- `hook.GetTable()` — hooks are registered/removed by addons at any time. Caching gives stale data.
+- `player.GetAll()` — changes every cycle (players join/leave). Each collector stores it in `local players` inside `Collect()`.
+- `gmod.GetGamemode()` / `engine.ActiveGamemode()` — only cache with explicit invalidation via `gamemode.PostGamemodeLoaded` hook.
+
+## General cautions
+
+- **`replaceAll` on strings inside code**: verify it does NOT replace inside `local` declarations. If the target string appears on both sides of an assignment (`local foo = foo`), the RHS gets corrupted. Always use targeted edits for declarations.
+- **NaN/Inf**: Lua's division by zero produces `inf`, not an error. Always guard numerical metrics with `value < math.huge and value > -math.huge`.
+- **`include()` resets locals**: if a file is `include()`d again (e.g., `lua_openscript`), all top-level `local` variables are re-initialized, resetting counters and state.
