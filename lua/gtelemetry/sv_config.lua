@@ -9,7 +9,7 @@
 GTelemetry.Config = GTelemetry.Config or {}
 
 local table_insert = table.insert
-local table_concat = table_concat
+local table_concat = table.concat
 local string_match = string.match
 
 -- ConVar definitions
