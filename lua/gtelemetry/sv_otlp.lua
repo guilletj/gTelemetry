@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     sv_otlp.lua — OTLP/HTTP JSON builder & transport
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Builds ExportMetricsServiceRequest payloads in OTLP JSON format
     and sends them to a Grafana Alloy otelcol.receiver.otlp endpoint.
 ]]

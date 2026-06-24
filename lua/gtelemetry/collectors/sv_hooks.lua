@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_hooks.lua — Hook performance & error tracking
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: total hook count, Think/Tick call count & timing, Lua errors,
     hook count per event type.
 ]]

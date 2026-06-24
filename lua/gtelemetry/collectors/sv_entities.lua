@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_entities.lua — Entity count metrics
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: total entities, props, NPCs, players, weapons, vehicles.
 ]]
 

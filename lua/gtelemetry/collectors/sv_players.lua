@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_players.lua — Player metrics + client FPS data receiver
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: player count, bots, pings, client FPS, kills, deaths, connection time, load time.
     Receives client-side FPS data via the net library.
 ]]

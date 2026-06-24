@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_server.lua — Server performance metrics
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: tick rate, frame time, FPS, Lua memory, uptime, max players.
 ]]
 

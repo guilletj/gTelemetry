@@ -94,13 +94,13 @@ All configuration is done via server ConVars, either in `server.cfg` or the serv
 gTelemetry uses a **3-level pipeline** — each level has its own timing:
 
 ```
-┌─ NIVEL 1: Client measurement ─────────────────────────────┐
+┌─ LEVEL 1: Client measurement ─────────────────────────────┐
 │  Client FPS timer (hardcoded 5s):                         │
 │  Measures local FPS every 5 seconds and sends to server   │
 │  via net message. The server caches the latest value.     │
 └──────────────────────────────┬────────────────────────────┘
                                │
-┌─ NIVEL 2: Collector sampling ────────────────────────────┐
+┌─ LEVEL 2: Collector sampling ────────────────────────────┐
 │  gtelemetry_interval (default 10s):                      │
 │  Triggers CollectAndSend() which calls every collector.  │
 │  Each collector re-samples its data at this moment.      │
@@ -111,7 +111,7 @@ gTelemetry uses a **3-level pipeline** — each level has its own timing:
 │  if gtelemetry_interval is 10).                          │
 └──────────────────────────────┬───────────────────────────┘
                                │
-┌─ NIVEL 3: Export to Alloy ───────────────────────────────┐
+┌─ LEVEL 3: Export to Alloy ───────────────────────────────┐
 │  gtelemetry_interval (default 10s):                      │
 │  The same timer. After collecting, the payload is built  │
 │  and sent via HTTP POST. This decides how often data     │
@@ -327,4 +327,4 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 
 ## License
 
-MIT License — Feel free to use, modify, and distribute.
+MIT License — Feel free to use, modify, and distribute. See [LICENSE](../LICENSE) for details.

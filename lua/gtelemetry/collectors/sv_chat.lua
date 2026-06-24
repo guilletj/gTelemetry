@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_chat.lua — Chat & admin command tracking
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: chat message count, admin command count.
     Supports auto-detection of common admin mods (ULX, SAM, FAdmin).
 ]]

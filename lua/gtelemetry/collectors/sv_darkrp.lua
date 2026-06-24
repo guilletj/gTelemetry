@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_darkrp.lua — DarkRP economic metrics
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Auto-loaded only when DarkRP is detected.
     Collects: money in circulation, average money, jobs, props per player,
     wanted/arrested counts.

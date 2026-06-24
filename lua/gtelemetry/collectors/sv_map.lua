@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_map.lua — Map & server info metrics
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: server info label metric, map change counter.
 ]]
 

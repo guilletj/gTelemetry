@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     collectors/sv_network.lua — Network metrics
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Collects: per-player network bytes in/out aggregated, net message counts.
     Note: GMod's Lua API has limited native access to raw network I/O stats.
     This collector uses best-effort methods with available APIs.

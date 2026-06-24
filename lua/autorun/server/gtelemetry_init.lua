@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     gtelemetry_init.lua — Server entry point
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Initializes the gTelemetry telemetry system:
     - Creates the GTelemetry global namespace
     - Loads all modules and collectors

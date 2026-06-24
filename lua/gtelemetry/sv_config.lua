@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     sv_config.lua — ConVar definitions & configuration helpers
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     All server configuration is managed through ConVars,
     allowing admins to configure via server.cfg or console.
 ]]
