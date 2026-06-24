@@ -25,13 +25,14 @@ Monitor server performance, players, entities, network, Lua errors, and more fro
 ## Features
 
 - **~59 metrics** across 8 collectors + **Loki log export** (optional)
-- **10 log event types** — chat, player join/leave, deaths, Lua errors, admin commands (ULX, SAM, FAdmin), map changes, server start/stop
+- **27+ log event types** — chat, player join/leave, deaths, Lua errors, admin commands (ULX, SAM, FAdmin, xAdmin), map changes, server start/stop, spawns, item pickups
 - **Event-driven logging** — hooks capture events in real-time with buffered flush, no polling
 - **Zero dependencies** — uses native GMod `HTTP()` function
 - **OTLP standard** — compatible with any OpenTelemetry-compatible backend
 - **DarkRP auto-detection** — economic metrics load automatically when DarkRP is present
+- **bLogs bridge** — optional integration with Billy's Logs via MODULE:Hook or LogPhrase interception
 - **Client FPS tracking** — collects client performance data via net library
-- **Admin mod detection** — automatically hooks into ULX, SAM, and FAdmin for command tracking
+- **Admin mod detection** — automatically hooks into ULX, SAM, FAdmin, and xAdmin for command tracking
 - **Entity ownership breakdown** — per-player entity counts grouped by type (configurable)
 - **Network message details** — per-message-name breakdown (configurable, high-cardinality gated)
 - **Configurable** — all settings via server ConVars, runtime reconfiguration without restart
@@ -54,26 +55,28 @@ Monitor server performance, players, entities, network, Lua errors, and more fro
    │   └── gtelemetry/
    │       ├── sv_config.lua
    │       ├── sv_otlp.lua
-   │       ├── sv_otlp_logs.lua
-   │       └── collectors/
-   │           ├── sv_server.lua
-   │           ├── sv_players.lua
-   │           ├── sv_entities.lua
-   │           ├── sv_network.lua
-   │           ├── sv_hooks.lua
-   │           ├── sv_map.lua
-   │           ├── sv_chat.lua
-   │           ├── sv_darkrp.lua
-   │           └── sv_log_events.lua
-   ├── docs/
-   │   ├── alloy_example.hcl
-   │   ├── alert_rules.md
-   │   ├── discord_templates.md
-   │   ├── metrics_reference.md
-   │   └── log_events_reference.md
-   ├── README.md
-   └── LICENSE
-   ```
+    │       ├── sv_otlp_logs.lua
+    │       └── collectors/
+    │           ├── sv_server.lua
+    │           ├── sv_players.lua
+    │           ├── sv_entities.lua
+    │           ├── sv_network.lua
+    │           ├── sv_hooks.lua
+    │           ├── sv_map.lua
+    │           ├── sv_chat.lua
+    │           ├── sv_darkrp.lua
+    │           ├── sv_log_events.lua
+    │           └── sv_blogs.lua
+    ├── docs/
+    │   ├── alloy_example.hcl
+    │   ├── alert_rules.md
+    │   ├── discord_templates.md
+    │   ├── metrics_reference.md
+    │   ├── log_events_reference.md
+    │   └── cvars_reference.md
+    ├── README.md
+    └── LICENSE
+    ```
 
 2. **Required:** Start your server with `-allowlocalhttp` to allow HTTP to private IPs:
 
@@ -85,7 +88,7 @@ Monitor server performance, players, entities, network, Lua errors, and more fro
 
 ## Configuration
 
-All settings are managed via server ConVars — no config files.
+All settings are managed via server ConVars — no config files. See [`docs/cvars_reference.md`](docs/cvars_reference.md) for the full reference.
 
 ### Metrics ConVars
 
@@ -112,6 +115,7 @@ All settings are managed via server ConVars — no config files.
 | `gtelemetry_log_interval` | `10` | Log flush interval in seconds (1-300) |
 | `gtelemetry_log_buffer_size` | `1000` | Maximum log entries buffered before dropping oldest (100-10000) |
 | `gtelemetry_log_spawn` | `0` | Enable logging of spawn events (props, NPCs, SENTs, ragdolls, effects, item pickups). May be noisy on sandbox servers |
+| `gtelemetry_log_blogs_mode` | `off` | bLogs integration mode: `off` (core collectors), `replace` (bLogs bridge via MODULE:Hook), `intercept` (LogPhrase wrapper), `hybrid` (both) |
 
 ### How intervals work — metrics
 
@@ -174,6 +178,9 @@ gtelemetry_service_name "my-darkrp-server"
 gtelemetry_log_enabled 1
 gtelemetry_log_endpoint "http://192.168.1.100:4318/v1/logs"
 gtelemetry_log_interval 10
+
+// bLogs integration (optional, requires bLogs + GAS)
+// gtelemetry_log_blogs_mode "replace"
 ```
 
 ## Backend Setup
@@ -196,9 +203,22 @@ gtelemetry_log_interval 10
 
 See [`docs/metrics_reference.md`](docs/metrics_reference.md) for the complete list of ~59 metrics across 8 collectors (server performance, players, entities, network, hooks, map, chat, DarkRP). All metrics are prefixed with `gmod.`.
 
-## Log Events Reference (`sv_log_events.lua`)
+## Log Events Reference
 
-See [`docs/log_events_reference.md`](docs/log_events_reference.md) for all 27 event types. Disabled by default — set `gtelemetry_log_enabled 1` to activate.`
+See [`docs/log_events_reference.md`](docs/log_events_reference.md) for all 27 event types. Disabled by default — set `gtelemetry_log_enabled 1` to activate.
+
+## bLogs Integration
+
+gTelemetry can integrate with [bLogs (Billy's Logs)](https://github.com/William278/Billys-Logs) via `gtelemetry_log_blogs_mode`:
+
+| Mode | Collector | How it works |
+|------|-----------|-------------|
+| `off` (default) | `sv_log_events.lua` | Core collector — hooks 27+ events directly via `hook.Add()` |
+| `replace` | `sv_blogs.lua` | Registers as a `GAS.Logging` module via `MODULE:Hook()` — same event coverage through bLogs' API |
+| `intercept` | `sv_blogs.lua` | Wraps `LogPhrase`/`Phrase` on GAS module metatables to capture ALL bLogs module output — no event-specific hooks |
+| `hybrid` | `sv_blogs.lua` | Runs both strategies: event-specific hooks via MODULE:Hook + catch-all LogPhrase interception. Common events may appear twice, distinguishable by `log.source` |
+
+Requires bLogs and GmodAdminSuite to be installed (except `off` mode). See [`docs/log_events_reference.md`](docs/log_events_reference.md) for detailed event tables and attributes per mode.`
 
 ## Troubleshooting
 
@@ -213,8 +233,9 @@ See [`docs/log_events_reference.md`](docs/log_events_reference.md) for all 27 ev
 
 1. **Check `gtelemetry_log_enabled 1`**: Log collection is disabled by default.
 2. **Check the endpoint**: Default is `http://localhost:4318/v1/logs`. Run `gtelemetry_debug 1` to see flush activity.
-3. **Alloy configuration**: Ensure your OTLP receiver routes logs to a Loki pipeline (see [Backend Setup](#lokiexperimental-log-pipeline)).
+3. **Alloy configuration**: Ensure your OTLP receiver routes logs to a Loki pipeline (see [Backend Setup](#grafana-alloy)).
 4. **Buffer overflow**: Increase `gtelemetry_log_buffer_size` if the server produces many events. Dropped logs are tracked in the health metric.
+5. **bLogs mode**: If using `gtelemetry_log_blogs_mode`, ensure bLogs and GmodAdminSuite are installed. Check server console for bLogs detection messages with `gtelemetry_debug 1`.
 
 ### DarkRP metrics not appearing
 

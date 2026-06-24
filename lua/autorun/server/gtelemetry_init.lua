@@ -62,7 +62,19 @@ include("gtelemetry/collectors/sv_hooks.lua")
 include("gtelemetry/collectors/sv_map.lua")
 include("gtelemetry/collectors/sv_chat.lua")
 include("gtelemetry/collectors/sv_darkrp.lua")
-include("gtelemetry/collectors/sv_log_events.lua")
+
+-- bLogs bridge: always include the module definition (it's small)
+include("gtelemetry/collectors/sv_blogs.lua")
+
+-- Log events: skip core collector when any bLogs bridge mode is active
+-- NOTE: IsBlogsAvailable() at load time might return false if GAS hasn't loaded yet.
+-- That's safe — sv_log_events is included as fallback, and StartLogCollection()
+-- re-checks at runtime to dispatch to the correct collector.
+if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
+    GTelemetry.Log("bLogs detected — using bLogs bridge for log collection")
+else
+    include("gtelemetry/collectors/sv_log_events.lua")
+end
 
 --- Start (or restart) the metric collection timer.
 function GTelemetry.StartCollection()
@@ -79,7 +91,11 @@ end
 function GTelemetry.StartLogCollection()
     if not GTelemetry.Config.IsLogEnabled() then return end
 
-    GTelemetry.Collectors.LogEvents.Init()
+    if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
+        GTelemetry.Collectors.BLogs.Init()
+    else
+        GTelemetry.Collectors.LogEvents.Init()
+    end
 
     local interval = GTelemetry.Config.GetLogInterval()
     timer.Create("GTelemetry_LogFlush", interval, 0, function()

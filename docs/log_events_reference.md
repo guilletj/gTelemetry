@@ -2,6 +2,10 @@
 
 *Disabled by default — set `gtelemetry_log_enabled 1` to activate. No hooks are registered until enabled.*
 
+## Core log collectors (`gtelemetry_log_blogs_mode = "off"`)
+
+Uses `sv_log_events.lua` — hooks 28 events directly via `hook.Add()`.
+
 | Event | Severity | Body format | Attributes |
 |-------|----------|-------------|------------|
 | Chat message | INFO | `[TEAM] [PlayerName] message` | `log.source="chat"` |
@@ -39,3 +43,26 @@ Player names and Steam IDs appear **only in the log body**, never as indexed Lok
 
 Every log batch includes these resource-level attributes (same as metrics):
 - `service.name`, `service.version`, `host.name`, `gmod.map`, `gmod.gamemode`
+
+---
+
+## bLogs bridge (`gtelemetry_log_blogs_mode = "replace"`)
+
+Registers as a `GAS.Logging` module via `MODULE:Hook()`. Same event coverage and format as the core collectors above, but hooks go through bLogs' module API. Requires bLogs (Billy's Logs) and GmodAdminSuite to be installed.
+
+## bLogs interceptor (`gtelemetry_log_blogs_mode = "intercept"`)
+
+Wraps `LogPhrase`/`Phrase` on the GAS module metatable to capture ALL bLogs module output. No event-specific hooks needed.
+
+| Attribute | Description | Source |
+|---|---|---|
+| `log.source="blogs"` | Identifies logs from bLogs interception | Fixed |
+| `blogs.category` | bLogs module category (e.g. `"SAM"`, `"DarkRP"`) | `self.Category` |
+| `blogs.module` | bLogs module name (e.g. `"Commands"`) | `self.Name` |
+| `blogs.phrase` | Phrase key (e.g. `"command_used"`) | First arg to `LogPhrase` |
+
+Body format: `[bLogs/Category/Module] phraseKey: formatted arg 1 | arg 2 | ...`
+
+## bLogs hybrid (`gtelemetry_log_blogs_mode = "hybrid"`)
+
+Runs both MODULE:Hook (with `log.source` specific to each event) and LogPhrase interceptor (with `log.source="blogs"`). Common events are captured twice but distinguishable by `log.source`. Provides maximum coverage at the cost of some duplicate log entries.

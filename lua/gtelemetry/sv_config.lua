@@ -124,6 +124,12 @@ GTelemetry.Config.ConVars = {
         "Enable logging of spawn events (props, NPCs, SENTs, ragdolls, effects, item pickups). May be noisy on sandbox servers.",
         0, 1
     ),
+
+    log_blogs_mode = CreateConVar(
+        "gtelemetry_log_blogs_mode", "off",
+        FCVAR_ARCHIVE,
+        "bLogs integration mode: off (core collectors), replace (bLogs bridge via MODULE:Hook), intercept (LogPhrase wrapper), hybrid (both). Requires bLogs + GAS except in off mode."
+    ),
 }
 
 --- Returns whether gTelemetry is enabled.
@@ -230,6 +236,19 @@ function GTelemetry.Config.IsLogSpawnEnabled()
     return GTelemetry.Config.ConVars.log_spawn:GetBool()
 end
 
+--- Returns whether any bLogs integration mode is active.
+-- @return boolean
+function GTelemetry.Config.IsBlogsActive()
+    local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+    return mode == "replace" or mode == "intercept" or mode == "hybrid"
+end
+
+--- Returns whether bLogs is detected and available.
+-- @return boolean
+function GTelemetry.Config.IsBlogsAvailable()
+    return GAS and GAS.Logging and type(GAS.Logging.MODULE) == "function"
+end
+
 --- Print a debug message to server console (only when debug mode is on).
 -- @param ... any values to print
 function GTelemetry.Debug(...)
@@ -328,8 +347,14 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
         end
-        if GTelemetry.Collectors.LogEvents and GTelemetry.Collectors.LogEvents.Undo then
-            GTelemetry.Collectors.LogEvents.Undo()
+        if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
+            if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Undo then
+                GTelemetry.Collectors.BLogs.Undo()
+            end
+        else
+            if GTelemetry.Collectors.LogEvents and GTelemetry.Collectors.LogEvents.Undo then
+                GTelemetry.Collectors.LogEvents.Undo()
+            end
         end
     end
 end, "gtelemetry_log_enabled_change")

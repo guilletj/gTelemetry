@@ -1,0 +1,394 @@
+--[[
+    gTelemetry: GMod Telemetry
+    sv_blogs.lua — bLogs (Billy's Logs) bridge: MODULE:Hook + LogPhrase interceptor
+
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
+    Two strategies side by side, dispatched by gtelemetry_log_blogs_mode:
+    - replace: register as GAS.Logging module via MODULE:Hook()
+    - intercept: wrap LogPhrase/Phrase on GAS module metatable
+    - hybrid: both strategies active simultaneously
+]]
+
+GTelemetry.Collectors = GTelemetry.Collectors or {}
+GTelemetry.Collectors.BLogs = {}
+
+local _initialized = false
+local _module = nil
+
+local SEVERITY_INFO = 9
+local SEVERITY_WARN = 13
+local SEVERITY_ERROR = 17
+
+local AddLog = nil
+local Attribute = nil
+local tostring = tostring
+
+function GTelemetry.Collectors.BLogs.IsAvailable()
+    return GAS and GAS.Logging and type(GAS.Logging.MODULE) == "function"
+end
+
+function GTelemetry.Collectors.BLogs.Init()
+    if _initialized then return end
+    _initialized = true
+
+    if not GTelemetry.Collectors.BLogs.IsAvailable() then
+        GTelemetry.Warn("bLogs bridge: GAS.Logging not available")
+        return
+    end
+
+    if not GTelemetry.OTLP.Logs then
+        GTelemetry.Warn("bLogs bridge: GTelemetry.OTLP.Logs not available")
+        return
+    end
+
+    AddLog = function(severity, text, body, attrs)
+        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
+    end
+    Attribute = GTelemetry.OTLP.Logs.Attribute
+
+    local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+
+    if mode == "replace" or mode == "hybrid" then
+        _setupModule()
+    end
+
+    if mode == "intercept" or mode == "hybrid" then
+        GTelemetry.Collectors.BLogs.Interceptor.Install()
+    end
+
+    GTelemetry.Debug("bLogs bridge initialized (mode: " .. mode .. ")")
+end
+
+function GTelemetry.Collectors.BLogs.Undo()
+    if not _initialized then return end
+    _initialized = false
+
+    local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+
+    if mode == "replace" or mode == "hybrid" then
+        _cleanupModule()
+    end
+
+    if mode == "intercept" or mode == "hybrid" then
+        GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
+    end
+
+    _module = nil
+    GTelemetry.OTLP.Logs.ClearBuffer()
+    GTelemetry.Debug("bLogs bridge stopped")
+end
+
+local _hookSpecs = {
+    {event = "PlayerSay", id = "gtelemetry_chat", fn = function(ply, text, teamOnly)
+        if not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", (teamOnly and "[TEAM] " or "") .. "[" .. ply:Nick() .. "] " .. text, {Attribute("log.source", "chat")})
+    end},
+    {event = "PlayerInitialSpawn", id = "gtelemetry_join", fn = function(ply)
+        if not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " (" .. ply:SteamID() .. ") connected", {Attribute("log.source", "player"), Attribute("log.event", "connect")})
+    end},
+    {event = "PlayerDisconnected", id = "gtelemetry_leave", fn = function(ply)
+        if not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " (" .. ply:SteamID() .. ") disconnected", {Attribute("log.source", "player"), Attribute("log.event", "disconnect")})
+    end},
+    {event = "PlayerHurt", id = "gtelemetry_hurt", fn = function(victim, attacker, health, damage)
+        if not IsValid(victim) then return end
+        local vicName = victim:Nick()
+        local body
+        if IsValid(attacker) and attacker:IsPlayer() and attacker ~= victim then
+            body = attacker:Nick() .. " dealt " .. tostring(damage) .. " damage to " .. vicName
+        elseif IsValid(attacker) and attacker:IsNPC() then
+            body = vicName .. " was hurt by a " .. attacker:GetClass() .. " (" .. tostring(damage) .. " damage)"
+        else
+            body = vicName .. " took " .. tostring(damage) .. " damage"
+        end
+        AddLog(SEVERITY_INFO, "INFO", body, {Attribute("log.source", "combat"), Attribute("log.event", "hurt")})
+    end},
+    {event = "PlayerDeath", id = "gtelemetry_death", fn = function(victim, inflictor, attacker)
+        if not IsValid(victim) then return end
+        local vicName = victim:Nick()
+        local body
+        if IsValid(attacker) and attacker:IsPlayer() and attacker ~= victim then
+            local wpn = IsValid(inflictor) and inflictor:GetClass() or "unknown"
+            body = vicName .. " was killed by " .. attacker:Nick() .. " with " .. wpn
+        elseif IsValid(attacker) and attacker:IsNPC() then
+            body = vicName .. " was killed by a " .. attacker:GetClass()
+        elseif attacker == victim or not IsValid(attacker) then
+            body = vicName .. " died"
+        else
+            body = vicName .. " was killed"
+        end
+        AddLog(SEVERITY_INFO, "INFO", body, {Attribute("log.source", "player"), Attribute("log.event", "death")})
+    end},
+    {event = "PlayerChangedTeam", id = "gtelemetry_team", fn = function(ply, oldTeam, newTeam)
+        if not IsValid(ply) then return end
+        local oldName = team.GetName and team.GetName(oldTeam) or tostring(oldTeam)
+        local newName = team.GetName and team.GetName(newTeam) or tostring(newTeam)
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " joined " .. newName .. " (from " .. oldName .. ")", {Attribute("log.source", "player"), Attribute("log.event", "team_change")})
+    end},
+    {event = "PlayerEnteredVehicle", id = "gtelemetry_vehicle_enter", fn = function(ply, vehicle, role)
+        if not IsValid(ply) or not IsValid(vehicle) then return end
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " entered " .. vehicle:GetClass(), {Attribute("log.source", "vehicle"), Attribute("log.event", "enter")})
+    end},
+    {event = "PlayerExitedVehicle", id = "gtelemetry_vehicle_exit", fn = function(ply, vehicle)
+        if not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " exited " .. (IsValid(vehicle) and vehicle:GetClass() or "unknown"), {Attribute("log.source", "vehicle"), Attribute("log.event", "exit")})
+    end},
+    {event = "OnLuaError", id = "gtelemetry_error", fn = function(error, realm, stack, name, id)
+        local source = name and "[" .. name .. "]" or ""
+        local body = source .. " " .. tostring(error)
+        if stack then body = body .. "\n" .. tostring(stack) end
+        AddLog(SEVERITY_ERROR, "ERROR", body, {Attribute("log.source", "error"), Attribute("log.realm", realm or "SERVER")})
+    end},
+    {event = "ULibCommandCalled", id = "gtelemetry_ulx", fn = function(ply, cmd, args)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. (args and table.concat(args, " ") or ""), {Attribute("log.source", "admin"), Attribute("admin.mod", "ulx")})
+    end},
+    {event = "SAM.RanCommand", id = "gtelemetry_sam", fn = function(ply, cmd_name, args, cmd)
+        local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
+    end},
+    {event = "SAM.PlayerCommand", id = "gtelemetry_sam_legacy", fn = function(ply, cmd, args)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
+    end},
+    {event = "FAdmin_CommandCalled", id = "gtelemetry_fadmin", fn = function(ply, cmd, args)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
+    end},
+    {event = "FAdmin.Server.PlayerCommand", id = "gtelemetry_fadmin_server", fn = function(ply, cmd, args)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
+    end},
+    {event = "FAdmin_OnCommandExecuted", id = "gtelemetry_fadmin_exec", fn = function(ply, cmd, args, results)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
+    end},
+    {event = "xAdminCanRunCommand", id = "gtelemetry_xadmin", fn = function(ply, cmd, args, fromConsole)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
+    end},
+    {event = "xAdminCommandRun", id = "gtelemetry_xadmin_paid", fn = function(ply, target, cmd, args)
+        local who = IsValid(ply) and ply:Nick() or "Console"
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and table.concat(args, " ") or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
+    end},
+    {event = "PlayerSpawnedProp", id = "gtelemetry_spawn_prop", fn = function(ply, model, ent)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[Prop] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "prop")})
+    end},
+    {event = "PlayerSpawnedVehicle", id = "gtelemetry_spawn_vehicle", fn = function(ply, ent)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[Vehicle] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "vehicle")})
+    end},
+    {event = "PlayerSpawnedNPC", id = "gtelemetry_spawn_npc", fn = function(ply, ent)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[NPC] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "npc")})
+    end},
+    {event = "PlayerSpawnedSENT", id = "gtelemetry_spawn_sent", fn = function(ply, ent)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[SENT] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "sent")})
+    end},
+    {event = "PlayerSpawnedSWEP", id = "gtelemetry_spawn_swep", fn = function(ply, swep)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[SWEP] " .. ply:Nick() .. " spawned " .. (IsValid(swep) and swep:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "swep")})
+    end},
+    {event = "PlayerSpawnedRagdoll", id = "gtelemetry_spawn_ragdoll", fn = function(ply, model, ent)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[Ragdoll] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "ragdoll")})
+    end},
+    {event = "PlayerSpawnedEffect", id = "gtelemetry_spawn_effect", fn = function(ply, model, ent)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", "[Effect] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "effect")})
+    end},
+    {event = "PlayerPickupItem", id = "gtelemetry_pickup", fn = function(ply, item)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " picked up " .. (IsValid(item) and item:GetClass() or "unknown"), {Attribute("log.source", "item"), Attribute("log.event", "pickup")})
+    end},
+    {event = "PlayerDroppedWeapon", id = "gtelemetry_drop", fn = function(ply, weapon)
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " dropped " .. (IsValid(weapon) and weapon:GetClass() or "unknown"), {Attribute("log.source", "item"), Attribute("log.event", "drop")})
+    end},
+    {event = "InitPostEntity", id = "gtelemetry_map", fn = function()
+        local currentMap = game.GetMap() or "unknown"
+        if not _module._prevMap then
+            _module._prevMap = currentMap
+            AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. currentMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
+        elseif _module._prevMap ~= currentMap then
+            AddLog(SEVERITY_INFO, "INFO", "Map changed: " .. _module._prevMap .. " -> " .. currentMap, {Attribute("log.source", "system"), Attribute("log.event", "map_change")})
+            _module._prevMap = currentMap
+        else
+            _module._prevMap = currentMap
+        end
+    end},
+    {event = "gamemode.PostGamemodeLoaded", id = "gtelemetry_gamemode", fn = function()
+        AddLog(SEVERITY_INFO, "INFO", "Gamemode loaded: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown"), {Attribute("log.source", "system"), Attribute("log.event", "gamemode_change")})
+    end},
+    {event = "ShutDown", id = "gtelemetry_shutdown", fn = function()
+        AddLog(SEVERITY_WARN, "WARN", "Server shutting down", {Attribute("log.source", "system"), Attribute("log.event", "server_stop")})
+    end},
+}
+
+local function _setupModule()
+    _module = GAS.Logging:MODULE()
+    _module.Category = "gTelemetry"
+    _module.Name = "Loki Export"
+    _module.Colour = Color(0, 255, 200)
+
+    _module:Setup(function()
+        for _, spec in ipairs(_hookSpecs) do
+            _module:Hook(spec.event, spec.id, spec.fn)
+        end
+    end)
+
+    GAS.Logging:AddModule(_module)
+    GTelemetry.Debug("bLogs bridge registered " .. #_hookSpecs .. " hooks via MODULE:Hook()")
+end
+
+local function _cleanupModule()
+    for _, spec in ipairs(_hookSpecs) do
+        hook.Remove(spec.event, spec.id)
+    end
+    _module = nil
+    GTelemetry.Debug("bLogs bridge hooks removed")
+end
+
+GTelemetry.Collectors.BLogs.Interceptor = {}
+
+local _interceptorActive = false
+local _origLogPhrase = nil
+local _origPhrase = nil
+local _origAddModule = nil
+local _restoreTarget = nil
+local _restoreKey = nil
+
+function GTelemetry.Collectors.BLogs.Interceptor.Install()
+    if _interceptorActive then return end
+
+    AddLog = AddLog or function(severity, text, body, attrs)
+        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
+    end
+    Attribute = Attribute or GTelemetry.OTLP.Logs.Attribute
+
+    local ok, found = pcall(function()
+        local testModule = GAS.Logging:MODULE()
+        local mt = getmetatable(testModule)
+        if not mt then return false end
+
+        local target = mt
+        local key
+
+        if type(mt.LogPhrase) == "function" then
+            target = mt
+            key = "LogPhrase"
+        elseif type(mt.__index) == "table" and type(mt.__index.LogPhrase) == "function" then
+            target = mt.__index
+            key = "LogPhrase"
+        elseif type(mt.Phrase) == "function" then
+            target = mt
+            key = "Phrase"
+        elseif type(mt.__index) == "table" and type(mt.__index.Phrase) == "function" then
+            target = mt.__index
+            key = "Phrase"
+        else
+            return false
+        end
+
+        _origLogPhrase = target[key]
+        _restoreTarget = target
+        _restoreKey = key
+
+        target[key] = function(self, ...)
+            local results = {_origLogPhrase(self, ...)}
+            pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, self, ...)
+            return unpack(results)
+        end
+
+        return true
+    end)
+
+    if ok and found then
+        _interceptorActive = true
+        GTelemetry.Debug("bLogs bridge: wrapped " .. _restoreKey .. " on module metatable")
+    else
+        GTelemetry.Warn("bLogs bridge: could not find LogPhrase on metatable — wrapping AddModule as fallback")
+        GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
+    end
+end
+
+function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
+    if type(GAS.Logging.AddModule) ~= "function" then
+        GTelemetry.Warn("bLogs bridge: GAS.Logging.AddModule not available")
+        return
+    end
+
+    _origAddModule = GAS.Logging.AddModule
+    GAS.Logging.AddModule = function(self, mod)
+        local result = _origAddModule(self, mod)
+
+        if type(mod.LogPhrase) == "function" then
+            local orig = mod.LogPhrase
+            mod.LogPhrase = function(innerSelf, ...)
+                local innerResults = {orig(innerSelf, ...)}
+                pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
+                return unpack(innerResults)
+            end
+        elseif type(mod.Phrase) == "function" then
+            local orig = mod.Phrase
+            mod.Phrase = function(innerSelf, ...)
+                local innerResults = {orig(innerSelf, ...)}
+                pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
+                return unpack(innerResults)
+            end
+        end
+
+        return result
+    end
+
+    _interceptorActive = true
+    GTelemetry.Debug("bLogs bridge: wrapped GAS.Logging.AddModule")
+end
+
+function GTelemetry.Collectors.BLogs.Interceptor.OnLog(self, phraseKey, ...)
+    local category = self.Category or "unknown"
+    local name = self.Name or "unknown"
+    local args = {...}
+
+    local parts = {}
+    for i = 1, #args do
+        parts[#parts + 1] = tostring(args[i])
+    end
+
+    local body = "[bLogs/" .. category .. "/" .. name .. "] " .. tostring(phraseKey)
+    if #parts > 0 then
+        body = body .. ": " .. table.concat(parts, " | ")
+    end
+
+    AddLog(SEVERITY_INFO, "INFO", body, {
+        Attribute("log.source", "blogs"),
+        Attribute("blogs.category", category),
+        Attribute("blogs.module", name),
+        Attribute("blogs.phrase", tostring(phraseKey)),
+    })
+end
+
+function GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
+    if not _interceptorActive then return end
+    _interceptorActive = false
+
+    if _restoreTarget and _restoreKey and _origLogPhrase then
+        _restoreTarget[_restoreKey] = _origLogPhrase
+        GTelemetry.Debug("bLogs bridge: restored original " .. _restoreKey)
+    end
+
+    if _origAddModule then
+        GAS.Logging.AddModule = _origAddModule
+        _origAddModule = nil
+        GTelemetry.Debug("bLogs bridge: restored original AddModule")
+    end
+
+    _origLogPhrase = nil
+    _restoreTarget = nil
+    _restoreKey = nil
+end
