@@ -271,6 +271,8 @@ function GTelemetry.OTLP.CollectAndSend()
     end
     _isCollecting = true
 
+    GTelemetry.Debug("Collection cycle started")
+
     local ok, err = pcall(function()
         GTelemetry.OTLP._cycleTimeNano = GTelemetry.OTLP.GetTimeNano()
         local startWall = SysTime()
@@ -282,6 +284,8 @@ function GTelemetry.OTLP.CollectAndSend()
             if collector.Collect then
                 local ok2, result = pcall(collector.Collect)
                 if ok2 and result then
+                    local count = #result
+                    GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
                     for _, metric in ipairs(result) do
                         table_insert(allMetrics, metric)
                     end
@@ -289,12 +293,15 @@ function GTelemetry.OTLP.CollectAndSend()
                 elseif not ok2 then
                     GTelemetry.OTLP.CollectionErrors = GTelemetry.OTLP.CollectionErrors + 1
                     GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(result))
+                else
+                    GTelemetry.Debug("Collector '" .. name .. "' returned nil (skipped)")
                 end
             end
         end
 
         if #allMetrics == 0 then
             GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            GTelemetry.Debug("Total collectors: " .. table.Count(GTelemetry.Collectors))
             return
         end
 
