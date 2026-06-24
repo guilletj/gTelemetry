@@ -1,31 +1,32 @@
 # gTelemetry — GMod Telemetry
 
-A Garry's Mod server monitoring addon that exports telemetry metrics to **Grafana** via **Grafana Alloy** using the **OpenTelemetry (OTLP/HTTP JSON)** protocol.
+A Garry's Mod server monitoring addon that exports telemetry **metrics** and **logs** to **Grafana** via **Grafana Alloy** using the **OpenTelemetry (OTLP/HTTP JSON)** protocol.
 
-Monitor your GMod server's performance, players, entities, network, Lua errors, and more — all from beautiful Grafana dashboards.
-
-## Architecture
+Monitor server performance, players, entities, network, Lua errors, and more from Grafana dashboards. Optionally send server events (chat, joins, deaths, admin commands, errors) to **Loki** for log analysis.
 
 ```
 ┌─────────────────────┐  HTTP POST (OTLP/JSON)  ┌─────────────────────┐
 │    GMod Server      │  ─────────────────────> │   Grafana Alloy     │
 │  ┌───────────────┐  │   :4318/v1/metrics      │  otelcol receiver   │
-│  │  gTelemetry   │  │                         └──────────┬──────────┘
-│  │    (Lua)      │  │                                    │
-│  └───────────────┘  │                         ┌──────────┴──────────┐
-│  ┌───────────────┐  │                         │                     │
-│  │ Client module │  │                    ┌────┴─────┐         ┌─────┴────┐
-│  │ (FPS data)    │  │                    │Prometheus│         │ InfluxDB │
-│  └───────────────┘  │                    └────┬─────┘         └─────┬────┘
-└─────────────────────┘                         └──────────┬──────────┘
-                                                     ┌─────┴─────┐
-                                                     │  Grafana  │
-                                                     └───────────┘
+│  │  gTelemetry   │  │  ─────────────────────> │  (metrics + logs)   │
+│  │    (Lua)      │  │   :4318/v1/logs         └──────────┬──────────┘
+│  └───────────────┘  │                                    │
+│  ┌───────────────┐  │                         ┌──────────┴──────────┐
+│  │ Client module │  │                         │                     │
+│  │ (FPS data)    │  │                    ┌────┴─────┐         ┌─────┴────┐
+│  └───────────────┘  │                    │Prometheus│         │  Loki    │
+└─────────────────────┘                    └────┬─────┘         └─────┬────┘
+                                                 └──────────┬──────────┘
+                                                      ┌─────┴─────┐
+                                                      │  Grafana  │
+                                                      └───────────┘
 ```
 
 ## Features
 
-- **~59 metrics** across 8 collectors
+- **~59 metrics** across 8 collectors + **Loki log export** (optional)
+- **10 log event types** — chat, player join/leave, deaths, Lua errors, admin commands (ULX, SAM, FAdmin), map changes, server start/stop
+- **Event-driven logging** — hooks capture events in real-time with buffered flush, no polling
 - **Zero dependencies** — uses native GMod `HTTP()` function
 - **OTLP standard** — compatible with any OpenTelemetry-compatible backend
 - **DarkRP auto-detection** — economic metrics load automatically when DarkRP is present
@@ -35,14 +36,15 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
 - **Network message details** — per-message-name breakdown (configurable, high-cardinality gated)
 - **Configurable** — all settings via server ConVars, runtime reconfiguration without restart
 - **Late-init support** — works even if loaded after map start (e.g., via `lua_openscript`)
-- **Graceful shutdown** — sends final metrics push on server shutdown
+- **Graceful shutdown** — sends final metrics push and log flush on server shutdown
 - **Lightweight** — minimal performance impact, async HTTP sends, error-isolated collectors, configurable entity scan interval
 - **Resilient** — exponential backoff on HTTP failures (up to 2 minutes), health metrics for pipeline monitoring
-- **Alert-ready** — includes [ready-to-use Grafana alert rules](docs/alert_rules.md) for anomaly detection with zero configuration
+- **Alert-ready** — includes [ready-to-use Grafana alert rules](docs/alert_rules.md) for anomaly detection
 
 ## Installation
 
-1. Copy the entire addon folder to your GMod server's `addons` directory:
+1. Copy the addon folder to your GMod server's `addons` directory:
+
    ```
    garrysmod/addons/gTelemetry/
    ├── lua/
@@ -52,6 +54,7 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
    │   └── gtelemetry/
    │       ├── sv_config.lua
    │       ├── sv_otlp.lua
+   │       ├── sv_otlp_logs.lua
    │       └── collectors/
    │           ├── sv_server.lua
    │           ├── sv_players.lua
@@ -60,38 +63,56 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
    │           ├── sv_hooks.lua
    │           ├── sv_map.lua
    │           ├── sv_chat.lua
-   │           └── sv_darkrp.lua
-   └── README.md
+   │           ├── sv_darkrp.lua
+   │           └── sv_log_events.lua
+   ├── docs/
+   │   ├── alloy_example.hcl
+   │   ├── alert_rules.md
+   │   └── discord_templates.md
+   ├── README.md
+   └── LICENSE
    ```
 
-2. **Required:** Start your server with the `-allowlocalhttp` launch parameter to allow HTTP requests to local/private IP addresses:
+2. **Required:** Start your server with `-allowlocalhttp` to allow HTTP to private IPs:
+
    ```
    srcds.exe -game garrysmod +gamemode sandbox +map gm_construct -allowlocalhttp
    ```
 
-3. Restart the server or run `lua_openscript autorun/server/gtelemetry_init.lua` in the console.
+3. Restart the server, or run `lua_openscript autorun/server/gtelemetry_init.lua` in the console for a hot-reload.
 
 ## Configuration
 
-All configuration is done via server ConVars, either in `server.cfg` or the server console.
+All settings are managed via server ConVars — no config files.
+
+### Metrics ConVars
 
 | ConVar | Default | Description |
-|---|---|---|
+|--------|---------|-------------|
 | `gtelemetry_enabled` | `1` | Master enable/disable switch |
 | `gtelemetry_endpoint` | `http://localhost:4318/v1/metrics` | Alloy OTLP HTTP endpoint URL |
-| `gtelemetry_interval` | `10` | Collection/push interval in seconds (1-300) |
-| `gtelemetry_service_name` | `gmod-server` | OTLP service.name attribute (identifies this server in Grafana) |
+| `gtelemetry_interval` | `10` | Collection and push interval in seconds (1-300) |
+| `gtelemetry_service_name` | `gmod-server` | OTLP `service.name` resource attribute |
 | `gtelemetry_auth_token` | *(empty)* | Optional Bearer token for Alloy authentication |
 | `gtelemetry_debug` | `0` | Enable verbose debug logging to server console |
-| `gtelemetry_darkrp` | `1` | Enable DarkRP economic metrics (still requires DarkRP to be installed) |
+| `gtelemetry_darkrp` | `1` | Enable DarkRP economic metrics (still requires DarkRP) |
 | `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
-| `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle, 2 = every other, etc.). Higher values reduce CPU on large maps |
+| `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle). Higher values reduce CPU on large maps |
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
-| `gtelemetry_version` | `1.1.0` | Version info (replicated to clients) |
+| `gtelemetry_version` | `1.5.0` | Version info (replicated to clients) |
 
-### How intervals work
+### Log ConVars
 
-gTelemetry uses a **3-level pipeline** — each level has its own timing:
+| ConVar | Default | Description |
+|--------|---------|-------------|
+| `gtelemetry_log_enabled` | `0` | Enable OTLP log collection and export to Loki via Alloy |
+| `gtelemetry_log_endpoint` | `http://localhost:4318/v1/logs` | OTLP HTTP endpoint for log export |
+| `gtelemetry_log_interval` | `10` | Log flush interval in seconds (1-300) |
+| `gtelemetry_log_buffer_size` | `1000` | Maximum log entries buffered before dropping oldest (100-10000) |
+
+### How intervals work — metrics
+
+gTelemetry uses a **3-level pipeline** for metrics:
 
 ```
 ┌─ LEVEL 1: Client measurement ─────────────────────────────┐
@@ -107,115 +128,149 @@ gTelemetry uses a **3-level pipeline** — each level has its own timing:
 │                                                          │
 │  gtelemetry_entities_interval (default 1):               │
 │  Controls how many cycles pass between entity scans.     │
-│  At 5, entities are scanned every 5th cycle (every 50s   │
+│  At 5, entities are scanned every 5th cycle (every 50s  │
 │  if gtelemetry_interval is 10).                          │
 └──────────────────────────────┬───────────────────────────┘
                                │
 ┌─ LEVEL 3: Export to Alloy ───────────────────────────────┐
 │  gtelemetry_interval (default 10s):                      │
 │  The same timer. After collecting, the payload is built  │
-│  and sent via HTTP POST. This decides how often data     │
-│  arrives in Prometheus / Grafana.                        │
+│  and sent via HTTP POST. Decides how often data arrives  │
+│  in Prometheus / Grafana.                                │
 └──────────────────────────────────────────────────────────┘
 ```
 
 Key points:
-- **gtelemetry_interval** = both the sampling trigger AND the export interval. Data reaches Prometheus at this rate.
-- **gtelemetry_entities_interval** = skip N-1 cycles between entity scans to reduce CPU. Only affects entity metrics.
-- **Client FPS** is sent every 5s regardless of gtelemetry_interval. The server uses the last received value on each collect cycle.
-- All metrics use the collection timestamp (not the measurement timestamp). This is standard for Prometheus gauges and does not affect rate calculations.
+- **gtelemetry_interval** = both sampling trigger AND export interval
+- **gtelemetry_entities_interval** = skip N-1 cycles between entity scans. Only affects entity metrics
+- **Client FPS** is sent every 5s regardless of the interval. The server uses the last received value on each collect cycle
+- All metrics use the collection timestamp (standard for Prometheus gauges, does not affect rate calculations)
+
+### How intervals work — logs
+
+The log pipeline is **independent** from metrics:
+
+| Timing | Setting | Notes |
+|--------|---------|-------|
+| Event capture | Real-time via hooks | No polling — hooks fire instantly and queue log entries |
+| Buffer flush | `gtelemetry_log_interval` (default 10s) | Timer-based flush of the accumulated buffer |
+| Export | Same as flush interval | HTTP POST to the configured log endpoint |
+
+Logs are buffered as they happen and flushed periodically. This avoids one HTTP request per event while keeping log delivery near real-time. If the buffer exceeds `gtelemetry_log_buffer_size`, the oldest entries are dropped.
 
 ### Example server.cfg
 
 ```
-// gTelemetry configuration
+// gTelemetry — metrics
 gtelemetry_enabled 1
 gtelemetry_endpoint "http://192.168.1.100:4318/v1/metrics"
 gtelemetry_interval 15
 gtelemetry_service_name "my-darkrp-server"
-gtelemetry_debug 0
+
+// gTelemetry — logs (optional)
+gtelemetry_log_enabled 1
+gtelemetry_log_endpoint "http://192.168.1.100:4318/v1/logs"
+gtelemetry_log_interval 10
 ```
 
-## Setting Up Grafana Alloy
+## Backend Setup
 
-### 1. Install Grafana Alloy
+### Grafana Alloy
 
-Follow the [official Alloy installation guide](https://grafana.com/docs/alloy/latest/get-started/install/) for your platform.
+1. Install Alloy following the [official guide](https://grafana.com/docs/alloy/latest/get-started/install/)
+2. Create a `config.alloy` file with the metrics pipeline enabled by default and Loki logs as an optional block:
 
-### 2. Configure Alloy
+   ```hcl
+   // ════════════════════════════════════════════════════════════
+   // OTLP Receiver — accepts metrics (+ optionally logs)
+   // from gTelemetry via HTTP on port 4318
+   // ════════════════════════════════════════════════════════════
+   otelcol.receiver.otlp "gmod" {
+       http {
+           endpoint = "0.0.0.0:4318"
+       }
+       output {
+           metrics = [otelcol.processor.batch.default.input]
+           // Uncomment for Loki log support:
+           // logs    = [otelcol.processor.batch.logs.input]
+       }
+   }
 
-Use the example configuration in `docs/alloy_example.hcl` as a starting point:
+   // ════════════════════════════════════════════════════════════
+   // Metrics pipeline — Prometheus remote_write
+   // ════════════════════════════════════════════════════════════
+   otelcol.processor.batch "default" {
+       timeout = "5s"
+       send_batch_size = 1000
+       output {
+           metrics = [otelcol.exporter.prometheus.default.input]
+       }
+   }
 
-```hcl
-// Receive OTLP metrics from gTelemetry
-otelcol.receiver.otlp "gmod" {
-    http {
-        endpoint = "0.0.0.0:4318"
-    }
-    output {
-        metrics = [otelcol.processor.batch.default.input]
-    }
-}
+   otelcol.exporter.prometheus "default" {
+       forward_to = [prometheus.remote_write.default.receiver]
+   }
 
-// Batch before exporting
-otelcol.processor.batch "default" {
-    timeout = "5s"
-    output {
-        metrics = [otelcol.exporter.prometheus.default.input]
-    }
-}
+   prometheus.remote_write "default" {
+       endpoint {
+           url = "http://localhost:9090/api/v1/write"
+       }
+   }
 
-// Export to Prometheus
-otelcol.exporter.prometheus "default" {
-    forward_to = [prometheus.remote_write.default.receiver]
-}
+   // ════════════════════════════════════════════════════════════
+   // Optional: Loki log pipeline
+   // Uncomment the section below and set gtelemetry_log_enabled 1
+   // ════════════════════════════════════════════════════════════
+   // otelcol.processor.batch "logs" {
+   //     timeout = "5s"
+   //     send_batch_size = 500
+   //     output {
+   //         logs = [loki.write.default.input]
+   //     }
+   // }
+   //
+   // loki.write "default" {
+   //     endpoint {
+   //         url = "http://localhost:3100/loki/api/v1/push"
+   //     }
+   // }
+   ```
 
-prometheus.remote_write "default" {
-    endpoint {
-        url = "http://localhost:9090/api/v1/write"
-    }
-}
-```
+3. Run: `alloy run config.alloy`
+4. Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 
-### 3. Run Alloy
+See [`docs/alloy_example.hcl`](docs/alloy_example.hcl) for additional options (InfluxDB, dual export, auth).
 
-```bash
-alloy run config.alloy
-```
+### Grafana dashboards
 
-Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI).
-
-### 4. Set Up Grafana
-
-1. Add your Prometheus or InfluxDB as a data source in Grafana
-2. Create dashboards using the metrics listed below
-3. All metrics are prefixed with `gmod.` for easy filtering
-4. See [`docs/alert_rules.md`](docs/alert_rules.md) for ready-to-use alert rules — copy-paste PromQL expressions for server overload, entity explosions, memory leaks, Lua errors, and more
-5. See [`docs/discord_templates.md`](docs/discord_templates.md) for Discord notification templates — color-coded embeds with server, map, and value fields
+1. Add Prometheus and/or Loki as data sources
+2. Create dashboards using the metrics listed below (all prefixed `gmod.`)
+3. See [`docs/alert_rules.md`](docs/alert_rules.md) for ready-to-use PromQL alert rules
+4. See [`docs/discord_templates.md`](docs/discord_templates.md) for Discord notification embeds
 
 ## Metrics Reference
 
 ### Server Performance (`sv_server.lua`)
 
 | Metric | Type | Description |
-|---|---|---|
+|--------|------|-------------|
 | `gmod.server.tickrate` | Gauge | Configured server tick rate (Hz) |
-| `gmod.server.tick_interval` | Gauge | Time between server ticks (seconds) |
-| `gmod.server.frametime` | Gauge | Actual server frame time (seconds) |
+| `gmod.server.tick_interval` | Gauge | Time between server ticks (s) |
+| `gmod.server.frametime` | Gauge | Actual server frame time (s) |
 | `gmod.server.fps` | Gauge | Server frames per second |
 | `gmod.server.lua_memory` | Gauge | Lua state memory usage (bytes) |
-| `gmod.server.uptime` | Gauge | Server uptime since map load (seconds) |
+| `gmod.server.uptime` | Gauge | Server uptime since map load (s) |
 | `gmod.server.max_players` | Gauge | Maximum player slots |
-| `gmod.telemetry.active` | Gauge | Indicates gTelemetry is active and collecting (always 1) |
-| `gmod.telemetry.collection_errors` | Sum | Cumulative number of collector errors since server start |
-| `gmod.telemetry.send_failures` | Sum | Cumulative number of HTTP send failures since server start |
-| `gmod.server.collection_duration` | Gauge | Time spent collecting and sending metrics in the last cycle (seconds) |
-| `gmod.server.tick_duration` | Gauge | Ratio of frameTime to tickInterval — indicates server load (> 1.0 means server can't keep up) |
+| `gmod.server.tick_duration` | Gauge | Ratio of frameTime to tickInterval. > 1 means overloaded |
+| `gmod.server.collection_duration` | Gauge | Time spent collecting and sending in the last cycle (s) |
+| `gmod.telemetry.active` | Gauge | Always 1 — indicates gTelemetry is running |
+| `gmod.telemetry.collection_errors` | Sum | Cumulative collector errors since server start |
+| `gmod.telemetry.send_failures` | Sum | Cumulative HTTP send failures since server start |
 
 ### Players (`sv_players.lua`)
 
 | Metric | Type | Labels | Description |
-|---|---|---|---|
+|--------|------|--------|-------------|
 | `gmod.players.count` | Gauge | — | Connected player count |
 | `gmod.players.bots` | Gauge | — | Connected bot count |
 | `gmod.players.ping` | Gauge | `player.name`, `player.steam_id` | Per-player ping (ms) |
@@ -223,35 +278,35 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.players.client_fps` | Gauge | `player.name`, `player.steam_id` | Client-reported FPS |
 | `gmod.players.kills` | Sum | `player.name`, `player.steam_id` | Cumulative kills |
 | `gmod.players.deaths` | Sum | `player.name`, `player.steam_id` | Cumulative deaths |
-| `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (seconds) |
-| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Time from connect to client fully loaded (seconds). `-1` if client never reported ready within 120s timeout |
+| `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (s) |
+| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Connect-to-ready time (s). `-1` if client never reported ready within 120s |
 
 ### Entities (`sv_entities.lua`)
 
 | Metric | Type | Labels | Description |
-|---|---|---|---|
+|--------|------|--------|-------------|
 | `gmod.entities.total` | Gauge | — | Total entity count |
-| `gmod.entities.props` | Gauge | — | Prop entities |
-| `gmod.entities.ragdolls` | Gauge | — | Ragdoll entities |
-| `gmod.entities.npcs` | Gauge | — | NPC entities |
-| `gmod.entities.players` | Gauge | — | Player entities |
-| `gmod.entities.weapons` | Gauge | — | Weapon entities |
-| `gmod.entities.vehicles` | Gauge | — | Vehicle entities |
-| `gmod.entities.doors` | Gauge | — | Door entities |
+| `gmod.entities.props` | Gauge | — | Prop count |
+| `gmod.entities.ragdolls` | Gauge | — | Ragdoll count |
+| `gmod.entities.npcs` | Gauge | — | NPC count |
+| `gmod.entities.players` | Gauge | — | Player entity count |
+| `gmod.entities.weapons` | Gauge | — | Weapon count |
+| `gmod.entities.vehicles` | Gauge | — | Vehicle count |
+| `gmod.entities.doors` | Gauge | — | Door count |
 | `gmod.entities.scripted_ents` | Gauge | — | Scripted entities (SENTs) |
-| `gmod.entities.constraints` | Gauge | — | Constraint/rope/hydraulic entities |
-| `gmod.entities.effects` | Gauge | — | Effect entities |
+| `gmod.entities.constraints` | Gauge | — | Constraint/rope/hydraulic count |
+| `gmod.entities.effects` | Gauge | — | Effect entity count |
 | `gmod.physics.objects` | Gauge | — | Entities with an active physics object |
 | `gmod.entities.owned_by_player` | Gauge | `player.name`, `player.steam_id`, `entity.type`, `entity.class` | Entities owned per player, grouped by type |
 
 ### Network (`sv_network.lua`)
 
 | Metric | Type | Labels | Description |
-|---|---|---|---|
+|--------|------|--------|-------------|
 | `gmod.network.net_messages_out` | Sum | — | Net messages sent by server |
 | `gmod.network.net_messages_in` | Sum | — | Net messages received by server |
-| `gmod.network.messages_out_details` | Sum | `net.message` | Net messages sent per message name |
-| `gmod.network.messages_in_details` | Sum | `net.message` | Net messages received per message name |
+| `gmod.network.messages_out_details` | Sum | `net.message` | Per-message-name sent breakdown |
+| `gmod.network.messages_in_details` | Sum | `net.message` | Per-message-name received breakdown |
 | `gmod.network.active_receivers` | Gauge | — | Total registered net message receivers |
 | `gmod.network.packet_loss_avg` | Gauge | — | Average packet loss (%) |
 | `gmod.network.packet_loss` | Gauge | `player.name`, `player.steam_id` | Per-player packet loss (%) |
@@ -259,26 +314,26 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 ### Hooks & Errors (`sv_hooks.lua`)
 
 | Metric | Type | Labels | Description |
-|---|---|---|---|
+|--------|------|--------|-------------|
 | `gmod.hooks.count` | Gauge | — | Total registered hooks |
-| `gmod.hooks.think_total` | Sum | — | Cumulative Think hook executions since server start |
-| `gmod.hooks.tick_total` | Sum | — | Cumulative Tick hook executions since server start |
-| `gmod.hooks.think_time` | Gauge | — | Time spent in Think hooks last frame (seconds) |
-| `gmod.hooks.tick_time` | Gauge | — | Time spent in Tick hooks last tick (seconds) |
+| `gmod.hooks.think_total` | Sum | — | Cumulative Think hook executions |
+| `gmod.hooks.tick_total` | Sum | — | Cumulative Tick hook executions |
+| `gmod.hooks.think_time` | Gauge | — | Time spent in Think hooks last frame (s) |
+| `gmod.hooks.tick_time` | Gauge | — | Time spent in Tick hooks last tick (s) |
 | `gmod.lua.errors` | Sum | — | Cumulative Lua error count |
-| `gmod.hooks.by_event` | Gauge | `hook.event` | Hooks per event type |
+| `gmod.hooks.by_event` | Gauge | `hook.event` | Hooks per event type (top 20) |
 
 ### Map & Server Info (`sv_map.lua`)
 
 | Metric | Type | Labels | Description |
-|---|---|---|---|
+|--------|------|--------|-------------|
 | `gmod.server.info` | Gauge | `server.map`, `server.gamemode`, `server.hostname`, `server.ip` | Server info (always 1) |
 | `gmod.map.changes` | Sum | — | Map change count |
 
 ### Chat & Admin (`sv_chat.lua`)
 
 | Metric | Type | Description |
-|---|---|---|
+|--------|------|-------------|
 | `gmod.chat.messages` | Sum | Total chat messages |
 | `gmod.admin.commands` | Sum | Admin commands executed |
 
@@ -287,7 +342,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 *Only available when DarkRP is detected.*
 
 | Metric | Type | Labels | Description |
-|---|---|---|---|
+|--------|------|--------|-------------|
 | `gmod.darkrp.money_total` | Gauge | — | Total money in circulation |
 | `gmod.darkrp.money_avg` | Gauge | — | Average money per player |
 | `gmod.darkrp.job_count` | Gauge | `darkrp.job` | Players per job |
@@ -296,35 +351,64 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.darkrp.arrested_count` | Gauge | — | Arrested players |
 | `gmod.darkrp.money_per_player` | Gauge | `player.name`, `player.steam_id` | Money per player |
 
+## Log Events Reference (`sv_log_events.lua`)
+
+*Disabled by default — set `gtelemetry_log_enabled 1` to activate. No hooks are registered until enabled.*
+
+| Event | Severity | Body format | Attributes |
+|-------|----------|-------------|------------|
+| Chat message | INFO | `[TEAM] [PlayerName] message` | `log.source="chat"` |
+| Player join | INFO | `PlayerName (STEAM_0:0:xxx) connected` | `log.source="player"`, `log.event="connect"` |
+| Player leave | INFO | `PlayerName (STEAM_0:0:xxx) disconnected` | `log.source="player"`, `log.event="disconnect"` |
+| Player death | INFO | `Victim was killed by Attacker with Weapon` | `log.source="player"`, `log.event="death"` |
+| Lua error | ERROR | `[source] error message` + stack trace | `log.source="error"`, `log.realm` |
+| Admin (ULX) | INFO | `[Admin/ULX] Player ran: cmd args` | `log.source="admin"`, `admin.mod="ulx"` |
+| Admin (SAM) | INFO | `[Admin/SAM] Player ran: cmd args` | `log.source="admin"`, `admin.mod="sam"` |
+| Admin (FAdmin) | INFO | `[Admin/FAdmin] Player ran: cmd args` | `log.source="admin"`, `admin.mod="fadmin"` |
+| Map change | INFO | `Map changed: OLD_MAP -> NEW_MAP` | `log.source="system"`, `log.event="map_change"` |
+| Server start | INFO | `Server started — hostname, map, gamemode, version` | `log.source="system"`, `log.event="server_start"` |
+| Server shutdown | WARN | `Server shutting down` | `log.source="system"`, `log.event="server_stop"` |
+
+Player names and Steam IDs appear **only in the log body**, never as indexed Loki labels, to prevent high cardinality.
+
+### Resource attributes
+
+Every log batch includes these resource-level attributes (same as metrics):
+- `service.name`, `service.version`, `host.name`, `gmod.map`, `gmod.gamemode`
+
 ## Troubleshooting
 
 ### Metrics not reaching Alloy
 
-1. **Check `-allowlocalhttp`**: GMod blocks HTTP requests to private IPs by default. Ensure your server start script includes `-allowlocalhttp`.
-
-2. **Check the endpoint**: Run `gtelemetry_debug 1` in the server console to see detailed logging. Verify the endpoint URL matches your Alloy configuration.
-
-3. **Check Alloy is running**: Open `http://<alloy-host>:12345` in a browser to access Alloy's built-in UI.
-
+1. **Check `-allowlocalhttp`**: GMod blocks HTTP to private IPs by default. Ensure your server start script includes it.
+2. **Check the endpoint**: Run `gtelemetry_debug 1` in the server console to see detailed logging. Verify the endpoint URL.
+3. **Check Alloy is running**: Open `http://<alloy-host>:12345` in a browser.
 4. **Firewall**: Ensure port 4318 is open between your GMod server and Alloy.
+
+### Logs not reaching Loki
+
+1. **Check `gtelemetry_log_enabled 1`**: Log collection is disabled by default.
+2. **Check the endpoint**: Default is `http://localhost:4318/v1/logs`. Run `gtelemetry_debug 1` to see flush activity.
+3. **Alloy configuration**: Ensure your OTLP receiver routes logs to a Loki pipeline (see [Backend Setup](#lokiexperimental-log-pipeline)).
+4. **Buffer overflow**: Increase `gtelemetry_log_buffer_size` if the server produces many events. Dropped logs are tracked in the health metric.
 
 ### DarkRP metrics not appearing
 
-- DarkRP must be fully loaded before gTelemetry can detect it. If you see "DarkRP detected" in the server console, it's working.
-- Ensure `gtelemetry_darkrp` is set to `1`.
-- Verify the gamemode is actually DarkRP (not a derivative that doesn't expose standard DarkRP functions).
+- DarkRP must be fully loaded before gTelemetry can detect it. If you see "DarkRP detected" in the console, it's working.
+- Ensure `gtelemetry_darkrp 1`.
+- Verify the gamemode exposes standard DarkRP functions.
 
 ### High CPU usage
 
-- Increase the collection interval: `gtelemetry_interval 30`
-- Reduce entity scan frequency: `gtelemetry_entities_interval 5` (scan only every 5th cycle)
-- On very large servers (64+ players) with 10,000+ entities, the entity collector is the most expensive. Use `gtelemetry_entities_interval` to reduce its impact.
+- Increase `gtelemetry_interval` (e.g., `30`)
+- Increase `gtelemetry_entities_interval` (e.g., `5` — scan every 5th cycle)
+- On large servers (64+ players, 10k+ entities), the entity collector is the most expensive. `gtelemetry_entities_interval` helps most there.
 
 ### Authentication errors
 
-- If your Alloy instance requires authentication, set the Bearer token: `gtelemetry_auth_token "your-token-here"`
-- The ConVar is marked as `FCVAR_PROTECTED` so it won't appear in server info queries.
+- Set `gtelemetry_auth_token "your-token-here"` if your Alloy instance requires it.
+- The ConVar is `FCVAR_PROTECTED` — it won't appear in server info queries.
 
 ## License
 
-MIT License — Feel free to use, modify, and distribute. See [LICENSE](../LICENSE) for details.
+MIT License — See [LICENSE](../LICENSE) for details.

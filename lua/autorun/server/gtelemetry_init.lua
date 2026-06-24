@@ -17,7 +17,7 @@
 
 -- Initialize global namespace
 GTelemetry = GTelemetry or {}
-GTelemetry.Version = "1.1.0"
+GTelemetry.Version = "1.5.0"
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 
 -- Client files in autorun/client are automatically sent to the client
@@ -51,6 +51,7 @@ end
 -- Load core modules
 include("gtelemetry/sv_config.lua")
 include("gtelemetry/sv_otlp.lua")
+include("gtelemetry/sv_otlp_logs.lua")
 
 -- Load collectors
 include("gtelemetry/collectors/sv_server.lua")
@@ -61,6 +62,7 @@ include("gtelemetry/collectors/sv_hooks.lua")
 include("gtelemetry/collectors/sv_map.lua")
 include("gtelemetry/collectors/sv_chat.lua")
 include("gtelemetry/collectors/sv_darkrp.lua")
+include("gtelemetry/collectors/sv_log_events.lua")
 
 --- Start (or restart) the metric collection timer.
 function GTelemetry.StartCollection()
@@ -73,6 +75,20 @@ function GTelemetry.StartCollection()
     GTelemetry.Log("Collection timer started (interval: " .. interval .. "s)")
 end
 
+--- Start (or restart) the log flush timer.
+function GTelemetry.StartLogCollection()
+    if not GTelemetry.Config.IsLogEnabled() then return end
+
+    GTelemetry.Collectors.LogEvents.Init()
+
+    local interval = GTelemetry.Config.GetLogInterval()
+    timer.Create("GTelemetry_LogFlush", interval, 0, function()
+        GTelemetry.OTLP.Logs.Flush()
+    end)
+
+    GTelemetry.Log("Log collection started (interval: " .. interval .. "s, endpoint: " .. GTelemetry.Config.GetLogEndpoint() .. ")")
+end
+
 -- Initialize on server start
 hook.Add("InitPostEntity", "GTelemetry_Init", function()
     if not GTelemetry.Config.IsEnabled() then
@@ -81,6 +97,10 @@ hook.Add("InitPostEntity", "GTelemetry_Init", function()
     end
 
     GTelemetry.StartCollection()
+
+    if GTelemetry.Config.IsLogEnabled() then
+        GTelemetry.StartLogCollection()
+    end
 
     -- Log DarkRP detection
     if GTelemetry.Collectors.DarkRP and GTelemetry.Collectors.DarkRP.IsAvailable() then
@@ -103,6 +123,10 @@ if game.GetMap() and game.GetMap() ~= "" then
         if not timer.Exists("GTelemetry_Collect") and GTelemetry.Config.IsEnabled() then
             GTelemetry.StartCollection()
 
+            if GTelemetry.Config.IsLogEnabled() and not timer.Exists("GTelemetry_LogFlush") then
+                GTelemetry.StartLogCollection()
+            end
+
             -- Count current map since InitPostEntity already fired before module load
             if GTelemetry.Collectors.Map and GTelemetry.Collectors.Map.CountChange then
                 GTelemetry.Collectors.Map.CountChange()
@@ -115,6 +139,9 @@ if game.GetMap() and game.GetMap() ~= "" then
             GTelemetry.Log("Endpoint: " .. GTelemetry.Config.GetEndpoint())
             GTelemetry.Log("Interval: " .. GTelemetry.Config.GetInterval() .. "s")
             GTelemetry.Log("Service: " .. GTelemetry.Config.GetServiceName())
+            if GTelemetry.Config.IsLogEnabled() then
+                GTelemetry.Log("Log endpoint: " .. GTelemetry.Config.GetLogEndpoint())
+            end
         end
     end)
 end
@@ -127,6 +154,11 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
     if GTelemetry.Config.IsEnabled() then
         GTelemetry.Debug("Server shutting down, sending final metrics...")
         GTelemetry.OTLP.CollectAndSend()
+    end
+
+    if GTelemetry.Config.IsLogEnabled() then
+        GTelemetry.Debug("Server shutting down, flushing logs...")
+        GTelemetry.OTLP.Logs.Flush()
     end
 end)
 
