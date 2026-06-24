@@ -88,6 +88,42 @@ All configuration is done via server ConVars, either in `server.cfg` or the serv
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
 | `gtelemetry_version` | `1.0.0` | Version info (replicated to clients) |
 
+### How intervals work
+
+gTelemetry uses a **3-level pipeline** — each level has its own timing:
+
+```
+┌─ NIVEL 1: Client measurement ─────────────────────────────┐
+│  Client FPS timer (hardcoded 5s):                         │
+│  Measures local FPS every 5 seconds and sends to server   │
+│  via net message. The server caches the latest value.     │
+└──────────────────────────────┬────────────────────────────┘
+                               │
+┌─ NIVEL 2: Collector sampling ────────────────────────────┐
+│  gtelemetry_interval (default 10s):                      │
+│  Triggers CollectAndSend() which calls every collector.  │
+│  Each collector re-samples its data at this moment.      │
+│                                                          │
+│  gtelemetry_entities_interval (default 1):               │
+│  Controls how many cycles pass between entity scans.     │
+│  At 5, entities are scanned every 5th cycle (every 50s   │
+│  if gtelemetry_interval is 10).                          │
+└──────────────────────────────┬───────────────────────────┘
+                               │
+┌─ NIVEL 3: Export to Alloy ───────────────────────────────┐
+│  gtelemetry_interval (default 10s):                      │
+│  The same timer. After collecting, the payload is built  │
+│  and sent via HTTP POST. This decides how often data     │
+│  arrives in Prometheus / Grafana.                        │
+└──────────────────────────────────────────────────────────┘
+```
+
+Key points:
+- **gtelemetry_interval** = both the sampling trigger AND the export interval. Data reaches Prometheus at this rate.
+- **gtelemetry_entities_interval** = skip N-1 cycles between entity scans to reduce CPU. Only affects entity metrics.
+- **Client FPS** is sent every 5s regardless of gtelemetry_interval. The server uses the last received value on each collect cycle.
+- All metrics use the collection timestamp (not the measurement timestamp). This is standard for Prometheus gauges and does not affect rate calculations.
+
 ### Example server.cfg
 
 ```
