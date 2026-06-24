@@ -8,6 +8,8 @@
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Entities = {}
 
+local pairs = pairs
+local ipairs = ipairs
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil

@@ -185,7 +185,11 @@ function GTelemetry.Warn(...)
     for _, v in ipairs(args) do
         table_insert(parts, tostring(v))
     end
-    MsgC(Color(255, 200, 0), table.concat(parts, " ") .. "\n")
+    if Color then
+        MsgC(Color(255, 200, 0), table.concat(parts, " ") .. "\n")
+    else
+        print(table.concat(parts, " "))
+    end
 end
 
 -- Listen for interval changes to recreate the timer

@@ -10,6 +10,8 @@
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.DarkRP = {}
 
+local pairs = pairs
+local ipairs = ipairs
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
@@ -44,6 +46,7 @@ function GTelemetry.Collectors.DarkRP.Collect()
 
     local totalMoney = 0
     local humanCount = 0
+    local moneyPoints = {}
     local jobCounts = {}   -- [jobName] = count
     local wantedCount = 0
     local arrestedCount = 0
@@ -57,6 +60,12 @@ function GTelemetry.Collectors.DarkRP.Collect()
         -- Money
         local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
         totalMoney = totalMoney + (money or 0)
+        if money and money > 0 then
+            moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
+                Attribute("player.name", ply:Nick()),
+                Attribute("player.steam_id", ply:SteamID()),
+            })
+        end
 
         -- Job
         local jobTable = ply.getJobTable and ply:getJobTable()
@@ -102,6 +111,16 @@ function GTelemetry.Collectors.DarkRP.Collect()
             "Average money per player",
             "{currency}",
             {MakeDataPoint(math.Round(totalMoney / humanCount, 2))}
+        )
+    end
+
+    -- Money per player
+    if #moneyPoints > 0 then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.darkrp.money_per_player",
+            "Money per individual player",
+            "{currency}",
+            moneyPoints
         )
     end
 

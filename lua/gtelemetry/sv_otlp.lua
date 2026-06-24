@@ -15,6 +15,8 @@ local os_time = os.time
 local tostring = tostring
 local string_format = string.format
 local table_insert = table.insert
+local pairs = pairs
+local ipairs = ipairs
 
 -- os.time() gives epoch seconds (accurate, no drift)
 -- SysTime() gives high-res time, used only for fractional seconds
@@ -31,6 +33,7 @@ GTelemetry.OTLP._cycleTimeNano = nil
 local _backoffAttempts = 0
 local _nextSendTime = 0
 local _maxBackoff = 120
+local _cachedGamemode = nil
 
 -- Guard to prevent concurrent collection cycles from stacking
 local _isCollecting = false
@@ -82,7 +85,7 @@ function GTelemetry.OTLP.MakeDataPoint(value, attributes)
     }
 
     -- Set value type
-    if value == math.floor(value) and value < 1e15 and value > -1e15 then
+    if value == value and value == math.floor(value) and value < 1e15 and value > -1e15 then
         dp.asInt = tostring(value)
     else
         dp.asDouble = value
@@ -161,7 +164,10 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                         GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.0.0"),
                         GTelemetry.OTLP.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
-                        GTelemetry.OTLP.Attribute("gmod.gamemode", (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"),
+                        if not _cachedGamemode then
+                            _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
+                        end
+                        GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
                     },
                 },
                 scopeMetrics = {
@@ -247,9 +253,9 @@ function GTelemetry.OTLP.CollectAndSend()
         return
     end
     _isCollecting = true
-    GTelemetry.OTLP._cycleTimeNano = GTelemetry.OTLP.GetTimeNano()
 
     local ok, err = pcall(function()
+        GTelemetry.OTLP._cycleTimeNano = GTelemetry.OTLP.GetTimeNano()
         local startWall = SysTime()
 
         local allMetrics = {}
