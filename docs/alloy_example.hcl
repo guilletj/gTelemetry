@@ -18,6 +18,8 @@ otelcol.receiver.otlp "gmod" {
 
     output {
         metrics = [otelcol.processor.batch.default.input]
+        // Uncomment for Loki log support (see Loki section below):
+        // logs    = [otelcol.processor.batch.logs.input]
     }
 }
 
@@ -70,8 +72,22 @@ prometheus.remote_write "default" {
 //     }
 // }
 
-// ============================================================
-// OPTION C: Export to both Prometheus AND InfluxDB
-// ============================================================
-// To use both, uncomment both exporters above and list them
-// in the batch processor output.metrics array.
+// ════════════════════════════════════════════════════════════
+// Optional: Loki log pipeline
+// Uncomment the two blocks below AND the logs line in the
+// receiver output above. Then set gtelemetry_log_enabled 1.
+// ════════════════════════════════════════════════════════════
+
+// otelcol.processor.batch "logs" {
+//     timeout = "5s"
+//     send_batch_size = 500
+//     output {
+//         logs = [loki.write.default.receiver]
+//     }
+// }
+//
+// loki.write "default" {
+//     endpoint {
+//         url = "http://localhost:3100/loki/api/v1/push"
+//     }
+// }
