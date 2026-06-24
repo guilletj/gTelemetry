@@ -38,6 +38,7 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
 - **Graceful shutdown** — sends final metrics push on server shutdown
 - **Lightweight** — minimal performance impact, async HTTP sends, error-isolated collectors, configurable entity scan interval
 - **Resilient** — exponential backoff on HTTP failures (up to 2 minutes), health metrics for pipeline monitoring
+- **Alert-ready** — includes [ready-to-use Grafana alert rules](docs/alert_rules.md) for anomaly detection with zero configuration
 
 ## Installation
 
@@ -189,6 +190,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 1. Add your Prometheus or InfluxDB as a data source in Grafana
 2. Create dashboards using the metrics listed below
 3. All metrics are prefixed with `gmod.` for easy filtering
+4. See [`docs/alert_rules.md`](docs/alert_rules.md) for ready-to-use alert rules — copy-paste PromQL expressions for server overload, entity explosions, memory leaks, Lua errors, and more
 
 ## Metrics Reference
 
