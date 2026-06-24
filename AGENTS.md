@@ -22,8 +22,9 @@ GMod server **must** be started with `-allowlocalhttp` for HTTP to private/local
 - Each collector implements `Init()` (lazy) and `Collect()` → returns list of OTLP metric objects
 - Lazy-init pattern: `if not MakeGauge then Init() end` at top of `Collect()`
 - `GTelemetry.OTLP.CollectAndSend()` iterates all collectors via `pcall`, builds OTLP JSON, sends via GMod's `HTTP()`
+- `GTelemetry.OTLP._cycleTimeNano` caches the cycle timestamp — all data points share one `GetTimeNano()` call
 - Default endpoint: `http://localhost:4318/v1/metrics`
-- ~50 metrics, all prefixed `gmod.`
+- ~55 metrics, all prefixed `gmod.`
 - Config via ConVars (`gtelemetry_*`) — no config files
 - 8 collectors: Server, Players, Entities, Network, Hooks, Map, Chat, DarkRP
 
@@ -43,5 +44,8 @@ Deploy by copying the addon to `garrysmod/addons/` and restarting the server.
 - Cumulative counters track `_startTimeNano` and use `MakeCumulativeDataPoint`
 - Client FPS sent via `net` library (`GTelemetry_ClientData` message)
 - DarkRP auto-detected via `DarkRP.getPhrase`; metrics gated by `gtelemetry_darkrp`
-- Network collector wraps `net.Start` / `net.Receive` to count messages
+- Network collector wraps `net.Start` / `net.Receive` to count messages; `Undo()` restores originals
 - Server info carried as label-only metric (`gmod.server.info` = always 1)
+- Health counters (`GTelemetry.OTLP.CollectionErrors`, `.SendFailures`) exported from sv_otlp
+- Entity collector can skip cycles via `gtelemetry_entities_interval` to reduce CPU
+- Exponential backoff on HTTP failure (1s → 2s → 4s → … → 120s max)

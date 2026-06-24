@@ -65,6 +65,13 @@ GTelemetry.Config.ConVars = {
         0, 1
     ),
 
+    entities_interval = CreateConVar(
+        "gtelemetry_entities_interval", "1",
+        FCVAR_ARCHIVE,
+        "Collect entity metrics every N cycles (1 = every cycle, 2 = every other, etc.). Higher values reduce CPU on large maps.",
+        1, 20
+    ),
+
     network_details = CreateConVar(
         "gtelemetry_network_details", "0",
         FCVAR_ARCHIVE,
@@ -133,6 +140,12 @@ end
 -- @return boolean
 function GTelemetry.Config.IsEntitiesPerPlayerEnabled()
     return GTelemetry.Config.ConVars.entities_per_player:GetBool()
+end
+
+--- Returns how often entity metrics are collected (every N cycles, 1 = every cycle).
+-- @return number
+function GTelemetry.Config.GetEntitiesInterval()
+    return GTelemetry.Config.ConVars.entities_interval:GetInt()
 end
 
 --- Returns whether detailed net message breakdown is enabled.

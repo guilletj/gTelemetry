@@ -24,6 +24,9 @@ local table_insert = table.insert
 GTelemetry.OTLP.CollectionErrors = 0
 GTelemetry.OTLP.SendFailures = 0
 
+-- Cached timestamp for one collection cycle (avoid 200+ GetTimeNano calls)
+GTelemetry.OTLP._cycleTimeNano = nil
+
 -- Exponential backoff for HTTP retries
 local _backoffAttempts = 0
 local _nextSendTime = 0
@@ -73,7 +76,7 @@ end
 -- @param attributes table|nil optional list of OTLP attributes
 -- @return table OTLP data point
 function GTelemetry.OTLP.MakeDataPoint(value, attributes)
-    local timeNano = GTelemetry.OTLP.GetTimeNano()
+    local timeNano = GTelemetry.OTLP._cycleTimeNano or GTelemetry.OTLP.GetTimeNano()
     local dp = {
         timeUnixNano = timeNano,
     }
@@ -244,6 +247,7 @@ function GTelemetry.OTLP.CollectAndSend()
         return
     end
     _isCollecting = true
+    GTelemetry.OTLP._cycleTimeNano = GTelemetry.OTLP.GetTimeNano()
 
     local ok, err = pcall(function()
         local startWall = SysTime()
@@ -282,5 +286,6 @@ function GTelemetry.OTLP.CollectAndSend()
     if not ok then
         GTelemetry.Warn("CollectAndSend failed: " .. tostring(err))
     end
+    GTelemetry.OTLP._cycleTimeNano = nil
     _isCollecting = false
 end
