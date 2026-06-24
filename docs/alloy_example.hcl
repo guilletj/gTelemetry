@@ -68,7 +68,7 @@ prometheus.remote_write "default" {
 //     timeout = "5s"
 //     send_batch_size = 500
 //     output {
-//         logs = [loki.write.default.input]
+//         logs = [loki.write.default.receiver]
 //     }
 // }
 //
