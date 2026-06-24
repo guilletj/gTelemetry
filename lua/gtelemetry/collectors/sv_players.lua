@@ -9,6 +9,8 @@
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Players = {}
 
+local ipairs = ipairs
+
 -- Per-player state tracking
 local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadStart, loadTime }
 local _startTimeNano = nil

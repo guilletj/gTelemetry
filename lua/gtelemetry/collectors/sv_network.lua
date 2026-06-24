@@ -20,6 +20,8 @@ local _initialized = false
 local _originalNetStart = nil
 local _originalNetReceive = nil
 
+local pairs = pairs
+local ipairs = ipairs
 local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil

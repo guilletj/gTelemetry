@@ -20,6 +20,7 @@ local _luaErrors = 0         -- Cumulative Lua error count
 local _startTimeNano = nil
 local _initialized = false
 
+local pairs = pairs
 local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil
