@@ -14,6 +14,8 @@ local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local _startTimeNano = nil
 local _initialized = false
+local math_floor = math.floor
+local math_Round = math.Round
 
 --- Initialize references (called after OTLP module is loaded).
 function GTelemetry.Collectors.Server.Init()
@@ -40,7 +42,7 @@ function GTelemetry.Collectors.Server.Collect()
         "gmod.server.tickrate",
         "Configured server tick rate",
         "Hz",
-        {MakeDataPoint(math.Round(1 / tickInterval))}
+        {MakeDataPoint(math_Round(1 / tickInterval))}
     )
 
     -- Tick interval
@@ -66,7 +68,7 @@ function GTelemetry.Collectors.Server.Collect()
             "gmod.server.tick_duration",
             "Ratio of frame time to tick interval — server load indicator. >1 means overloaded.",
             "{ratio}",
-            {MakeDataPoint(math.Round(frameTime / tickInterval, 4))}
+            {MakeDataPoint(math_Round(frameTime / tickInterval, 4))}
         )
     end
 
@@ -79,7 +81,7 @@ function GTelemetry.Collectors.Server.Collect()
         "gmod.server.fps",
         "Server frames per second",
         "{fps}",
-        {MakeDataPoint(math.Round(serverFPS, 2))}
+        {MakeDataPoint(math_Round(serverFPS, 2))}
     )
 
     -- Lua memory usage (in bytes)
@@ -88,7 +90,7 @@ function GTelemetry.Collectors.Server.Collect()
         "gmod.server.lua_memory",
         "Lua state memory usage",
         "By",
-        {MakeDataPoint(math.floor(luaMemoryKB * 1024))}
+        {MakeDataPoint(math_floor(luaMemoryKB * 1024))}
     )
 
     -- Server uptime
@@ -96,7 +98,7 @@ function GTelemetry.Collectors.Server.Collect()
         "gmod.server.uptime",
         "Server uptime since map load",
         "s",
-        {MakeDataPoint(math.Round(CurTime(), 1))}
+        {MakeDataPoint(math_Round(CurTime(), 1))}
     )
 
     -- Max players

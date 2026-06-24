@@ -10,6 +10,7 @@ GTelemetry.Collectors.Entities = {}
 
 local pairs = pairs
 local ipairs = ipairs
+local string_StartWith = string.StartWith
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
@@ -51,23 +52,23 @@ local _noPhysicsPrefix = {
 -- @param class string pre-fetched class name
 -- @return number entity type constant
 local function ClassifyEntity(ent, class)
-    if string.StartWith(class, "prop_physics") or class == "prop_dynamic" then
+    if string_StartWith(class, "prop_physics") or class == "prop_dynamic" then
         return ENTITY_PROPS
     elseif class == "prop_ragdoll" then
         return ENTITY_RAGDOLL
-    elseif string.StartWith(class, "npc_") then
+    elseif string_StartWith(class, "npc_") then
         return ENTITY_NPC
     elseif ent:IsWeapon() then
         return ENTITY_WEAPON
     elseif ent:IsVehicle() then
         return ENTITY_VEHICLE
-    elseif string.StartWith(class, "prop_door") or string.StartWith(class, "func_door") then
+    elseif string_StartWith(class, "prop_door") or string_StartWith(class, "func_door") then
         return ENTITY_DOOR
-    elseif string.StartWith(class, "sent_") or string.StartWith(class, "gmod_") then
+    elseif string_StartWith(class, "sent_") or string_StartWith(class, "gmod_") then
         return ENTITY_SCRIPTED
-    elseif string.StartWith(class, "constraint_") or string.StartWith(class, "rope_") or string.StartWith(class, "hydraulic_") then
+    elseif string_StartWith(class, "constraint_") or string_StartWith(class, "rope_") or string_StartWith(class, "hydraulic_") then
         return ENTITY_CONSTRAINT
-    elseif string.StartWith(class, "env_") then
+    elseif string_StartWith(class, "env_") then
         return ENTITY_EFFECT
     end
     return ENTITY_OTHER
@@ -78,7 +79,7 @@ end
 -- @return boolean
 local function EntityHasPhysics(class)
     for prefix in pairs(_noPhysicsPrefix) do
-        if string.StartWith(class, prefix) then return false end
+        if string_StartWith(class, prefix) then return false end
     end
     return true
 end

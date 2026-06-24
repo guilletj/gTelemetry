@@ -26,6 +26,7 @@ local MakeDataPoint = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
+local math_Round = math.Round
 local table_sort = table.sort
 
 local _maxHookCardinality = 20  -- Max unique hook events to report
@@ -130,7 +131,7 @@ function GTelemetry.Collectors.Hooks.Collect()
         "gmod.hooks.think_time",
         "Time spent executing Think hooks in the last frame",
         "s",
-        {MakeDataPoint(math.Round(_thinkTime, 6))}
+        {MakeDataPoint(math_Round(_thinkTime, 6))}
     )
 
     -- Tick hook execution time (last tick)
@@ -138,7 +139,7 @@ function GTelemetry.Collectors.Hooks.Collect()
         "gmod.hooks.tick_time",
         "Time spent executing Tick hooks in the last tick",
         "s",
-        {MakeDataPoint(math.Round(_tickTime, 6))}
+        {MakeDataPoint(math_Round(_tickTime, 6))}
     )
 
     -- Lua errors (cumulative counter)

@@ -10,8 +10,9 @@ GTelemetry.Collectors.Map = {}
 
 -- Track map changes
 local _mapChanges = 0
-local _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+local _startTimeNano = nil
 local _initialized = false
+local _mapCountedThisLoad = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
@@ -21,6 +22,8 @@ local Attribute = nil
 
 -- Register immediately (not inside Init) so it catches InitPostEntity on first load
 hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
+    if _mapCountedThisLoad then return end
+    _mapCountedThisLoad = true
     _mapChanges = _mapChanges + 1
     GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
 end)
@@ -28,6 +31,8 @@ end)
 --- Manually increment the map change counter.
 -- Used by the late-init path when InitPostEntity has already fired.
 function GTelemetry.Collectors.Map.CountChange()
+    if _mapCountedThisLoad then return end
+    _mapCountedThisLoad = true
     _mapChanges = _mapChanges + 1
     GTelemetry.Debug("Map counted externally: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
 end
@@ -35,6 +40,7 @@ end
 function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true
+    _startTimeNano = GTelemetry.OTLP.GetTimeNano()
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum

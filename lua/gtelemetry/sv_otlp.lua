@@ -17,6 +17,7 @@ local string_format = string.format
 local table_insert = table.insert
 local pairs = pairs
 local ipairs = ipairs
+local math_floor = math.floor
 
 -- os.time() gives epoch seconds (accurate, no drift)
 -- SysTime() gives high-res time, used only for fractional seconds
@@ -34,6 +35,11 @@ local _backoffAttempts = 0
 local _nextSendTime = 0
 local _maxBackoff = 120
 local _cachedGamemode = nil
+
+-- Reset gamemode cache when the gamemode changes
+hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
+    _cachedGamemode = nil
+end)
 
 -- Guard to prevent concurrent collection cycles from stacking
 local _isCollecting = false
@@ -60,7 +66,7 @@ function GTelemetry.OTLP.Attribute(key, value)
 
     if valType == "number" then
         -- Check if integer or float
-        if value == math.floor(value) then
+        if value == value and value == math_floor(value) then
             otlpValue = {intValue = tostring(value)}
         else
             otlpValue = {doubleValue = value}
@@ -85,7 +91,7 @@ function GTelemetry.OTLP.MakeDataPoint(value, attributes)
     }
 
     -- Set value type
-    if value == value and value == math.floor(value) and value < 1e15 and value > -1e15 then
+    if value == value and value == math_floor(value) and value < 1e15 and value > -1e15 then
         dp.asInt = tostring(value)
     else
         dp.asDouble = value
