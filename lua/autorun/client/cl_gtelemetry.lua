@@ -2,6 +2,9 @@
     gTelemetry: GMod Telemetry
     cl_gtelemetry.lua — Client-side FPS reporter + ready signal
 
+    SPDX-License-Identifier: MIT
+    Copyright (c) 2026 Edyone
+
     Sends the client's FPS to the server periodically via the net library.
     Also signals the server immediately when the client code is loaded.
     This data is used by the server-side Players collector.

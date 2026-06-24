@@ -5,3 +5,5 @@
 .DS_Store
 Thumbs.db
 gTelemetry.7z
+.agents/
+AGENTS.md
