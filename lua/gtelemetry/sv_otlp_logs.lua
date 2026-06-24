@@ -132,9 +132,10 @@ function GTelemetry.OTLP.Logs.BuildPayload(logRecords)
 end
 
 --- Send log payload HTTP POST to the configured endpoint.
+--- Returns true if a request was initiated, false if skipped (backoff).
 function GTelemetry.OTLP.Logs.Send(jsonBody)
     local endpoint = GTelemetry.Config.GetLogEndpoint()
-    if not endpoint or endpoint == "" then return end
+    if not endpoint or endpoint == "" then return false end
 
     local headers = {
         ["Content-Type"] = "application/json",
@@ -147,7 +148,7 @@ function GTelemetry.OTLP.Logs.Send(jsonBody)
 
     if SysTime() < _nextSendTime then
         GTelemetry.Debug("Skipping log send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
-        return
+        return false
     end
 
     GTelemetry.Debug("Sending logs to: " .. endpoint .. " (" .. #jsonBody .. " bytes)")
@@ -179,6 +180,8 @@ function GTelemetry.OTLP.Logs.Send(jsonBody)
             GTelemetry.Warn("Failed to send logs: " .. tostring(err))
         end,
     })
+
+    return true
 end
 
 --- Flush buffered log entries.
@@ -194,14 +197,20 @@ function GTelemetry.OTLP.Logs.Flush()
     _logBuffer = {}
     _bufferSize = 0
 
-    local ok, err = pcall(function()
+    local success, result = pcall(function()
         local jsonBody = GTelemetry.OTLP.Logs.BuildPayload(records)
-        GTelemetry.OTLP.Logs.Send(jsonBody)
+        return GTelemetry.OTLP.Logs.Send(jsonBody)
     end)
 
-    if not ok then
-        GTelemetry.Warn("Log flush failed: " .. tostring(err))
-        -- Re-insert records on failure to avoid data loss
+    if not success then
+        GTelemetry.Warn("Log flush failed: " .. tostring(result))
+        for _, v in ipairs(records) do
+            table_insert(_logBuffer, v)
+        end
+        _bufferSize = #_logBuffer
+    elseif not result then
+        -- Send() returned false (backoff skip) — re-insert records to avoid data loss
+        GTelemetry.Debug("Log flush skipped (backoff active), re-inserting " .. #records .. " records")
         for _, v in ipairs(records) do
             table_insert(_logBuffer, v)
         end
