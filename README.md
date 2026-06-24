@@ -25,7 +25,7 @@ Monitor your GMod server's performance, players, entities, network, Lua errors, 
 
 ## Features
 
-- **~55 metrics** across 8 collectors
+- **~59 metrics** across 8 collectors
 - **Zero dependencies** — uses native GMod `HTTP()` function
 - **OTLP standard** — compatible with any OpenTelemetry-compatible backend
 - **DarkRP auto-detection** — economic metrics load automatically when DarkRP is present
@@ -207,6 +207,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.telemetry.collection_errors` | Sum | Cumulative number of collector errors since server start |
 | `gmod.telemetry.send_failures` | Sum | Cumulative number of HTTP send failures since server start |
 | `gmod.server.collection_duration` | Gauge | Time spent collecting and sending metrics in the last cycle (seconds) |
+| `gmod.server.tick_duration` | Gauge | Ratio of frameTime to tickInterval — indicates server load (> 1.0 means server can't keep up) |
 
 ### Players (`sv_players.lua`)
 
@@ -290,6 +291,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 | `gmod.darkrp.props_per_player` | Gauge | `player.name`, `player.steam_id` | Props per player |
 | `gmod.darkrp.wanted_count` | Gauge | — | Wanted players |
 | `gmod.darkrp.arrested_count` | Gauge | — | Arrested players |
+| `gmod.darkrp.money_per_player` | Gauge | `player.name`, `player.steam_id` | Money per player |
 
 ## Troubleshooting
 
