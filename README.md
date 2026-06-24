@@ -109,6 +109,7 @@ All settings are managed via server ConVars — no config files.
 | `gtelemetry_log_endpoint` | `http://localhost:4318/v1/logs` | OTLP HTTP endpoint for log export |
 | `gtelemetry_log_interval` | `10` | Log flush interval in seconds (1-300) |
 | `gtelemetry_log_buffer_size` | `1000` | Maximum log entries buffered before dropping oldest (100-10000) |
+| `gtelemetry_log_spawn` | `0` | Enable logging of spawn events (props, NPCs, SENTs, ragdolls, effects, item pickups). May be noisy on sandbox servers |
 
 ### How intervals work — metrics
 
@@ -358,16 +359,33 @@ See [`docs/alloy_example.hcl`](docs/alloy_example.hcl) for additional options (I
 | Event | Severity | Body format | Attributes |
 |-------|----------|-------------|------------|
 | Chat message | INFO | `[TEAM] [PlayerName] message` | `log.source="chat"` |
-| Player join | INFO | `PlayerName (STEAM_0:0:xxx) connected` | `log.source="player"`, `log.event="connect"` |
-| Player leave | INFO | `PlayerName (STEAM_0:0:xxx) disconnected` | `log.source="player"`, `log.event="disconnect"` |
-| Player death | INFO | `Victim was killed by Attacker with Weapon` | `log.source="player"`, `log.event="death"` |
+| Player join | INFO | `PlayerName (SID) connected` | `log.source="player"`, `log.event="connect"` |
+| Player leave | INFO | `PlayerName (SID) disconnected` | `log.source="player"`, `log.event="disconnect"` |
+| Player death | INFO | `Victim was killed by Attacker with weapon` | `log.source="player"`, `log.event="death"` |
+| Player hurt | INFO | `Attacker dealt X damage to Victim` | `log.source="combat"`, `log.event="hurt"` |
+| Team change | INFO | `Player joined Team (from OldTeam)` | `log.source="player"`, `log.event="team_change"` |
+| Vehicle enter | INFO | `Player entered vehicle_class` | `log.source="vehicle"`, `log.event="enter"` |
+| Vehicle exit | INFO | `Player exited vehicle_class` | `log.source="vehicle"`, `log.event="exit"` |
 | Lua error | ERROR | `[source] error message` + stack trace | `log.source="error"`, `log.realm` |
 | Admin (ULX) | INFO | `[Admin/ULX] Player ran: cmd args` | `log.source="admin"`, `admin.mod="ulx"` |
 | Admin (SAM) | INFO | `[Admin/SAM] Player ran: cmd args` | `log.source="admin"`, `admin.mod="sam"` |
 | Admin (FAdmin) | INFO | `[Admin/FAdmin] Player ran: cmd args` | `log.source="admin"`, `admin.mod="fadmin"` |
-| Map change | INFO | `Map changed: OLD_MAP -> NEW_MAP` | `log.source="system"`, `log.event="map_change"` |
+| Admin (xAdmin) | INFO | `[Admin/xAdmin] Player ran: cmd args` | `log.source="admin"`, `admin.mod="xadmin"` |
+| Prop spawned ¹ | INFO | `[Prop] Player spawned model` | `log.source="spawn"`, `spawn.type="prop"` |
+| Vehicle spawned ¹ | INFO | `[Vehicle] Player spawned class` | `log.source="spawn"`, `spawn.type="vehicle"` |
+| NPC spawned ¹ | INFO | `[NPC] Player spawned class` | `log.source="spawn"`, `spawn.type="npc"` |
+| SENT spawned ¹ | INFO | `[SENT] Player spawned class` | `log.source="spawn"`, `spawn.type="sent"` |
+| SWEP spawned ¹ | INFO | `[SWEP] Player spawned class` | `log.source="spawn"`, `spawn.type="swep"` |
+| Ragdoll spawned ¹ | INFO | `[Ragdoll] Player spawned model` | `log.source="spawn"`, `spawn.type="ragdoll"` |
+| Effect spawned ¹ | INFO | `[Effect] Player spawned model` | `log.source="spawn"`, `spawn.type="effect"` |
+| Item pickup ¹ | INFO | `Player picked up class` | `log.source="item"`, `log.event="pickup"` |
+| Weapon drop ¹ | INFO | `Player dropped class` | `log.source="item"`, `log.event="drop"` |
+| Map change | INFO | `Map changed: OLD -> NEW` | `log.source="system"`, `log.event="map_change"` |
+| Gamemode change | INFO | `Gamemode loaded: name` | `log.source="system"`, `log.event="gamemode_change"` |
 | Server start | INFO | `Server started — hostname, map, gamemode, version` | `log.source="system"`, `log.event="server_start"` |
 | Server shutdown | WARN | `Server shutting down` | `log.source="system"`, `log.event="server_stop"` |
+
+¹ Requires `gtelemetry_log_spawn 1` (default 0). Disabled by default to avoid noise on sandbox servers.
 
 Player names and Steam IDs appear **only in the log body**, never as indexed Loki labels, to prevent high cardinality.
 

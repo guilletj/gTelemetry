@@ -117,6 +117,13 @@ GTelemetry.Config.ConVars = {
         "Maximum number of log entries buffered before dropping oldest.",
         100, 10000
     ),
+
+    log_spawn = CreateConVar(
+        "gtelemetry_log_spawn", "0",
+        FCVAR_ARCHIVE,
+        "Enable logging of spawn events (props, NPCs, SENTs, ragdolls, effects, item pickups). May be noisy on sandbox servers.",
+        0, 1
+    ),
 }
 
 --- Returns whether gTelemetry is enabled.
@@ -215,6 +222,12 @@ end
 -- @return number
 function GTelemetry.Config.GetLogBufferSize()
     return GTelemetry.Config.ConVars.log_buffer_size:GetInt()
+end
+
+--- Returns whether spawn event logging is enabled.
+-- @return boolean
+function GTelemetry.Config.IsLogSpawnEnabled()
+    return GTelemetry.Config.ConVars.log_spawn:GetBool()
 end
 
 --- Print a debug message to server console (only when debug mode is on).
