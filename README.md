@@ -191,6 +191,7 @@ Verify Alloy is receiving data at `http://localhost:12345` (Alloy's built-in UI)
 2. Create dashboards using the metrics listed below
 3. All metrics are prefixed with `gmod.` for easy filtering
 4. See [`docs/alert_rules.md`](docs/alert_rules.md) for ready-to-use alert rules — copy-paste PromQL expressions for server overload, entity explosions, memory leaks, Lua errors, and more
+5. See [`docs/discord_templates.md`](docs/discord_templates.md) for Discord notification templates — color-coded embeds with server, map, and value fields
 
 ## Metrics Reference
 
