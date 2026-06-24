@@ -60,16 +60,24 @@ prometheus.remote_write "default" {
 
 // ════════════════════════════════════════════════════════════
 // Optional: Loki log pipeline
-// Uncomment the two blocks below AND the logs line in the
+// Uncomment the blocks below AND the logs line in the
 // receiver output above. Then set gtelemetry_log_enabled 1.
+//
+// otelcol.exporter.loki converts OTel logs → Loki format.
+// Direct wiring (otelcol.* → loki.write) fails because
+// otelcol.Consumer ≠ loki.LogsReceiver.
 // ════════════════════════════════════════════════════════════
 
 // otelcol.processor.batch "logs" {
 //     timeout = "5s"
 //     send_batch_size = 500
 //     output {
-//         logs = [loki.write.default.receiver]
+//         logs = [otelcol.exporter.loki.default.input]
 //     }
+// }
+//
+// otelcol.exporter.loki "default" {
+//     forward_to = [loki.write.default.receiver]
 // }
 //
 // loki.write "default" {
