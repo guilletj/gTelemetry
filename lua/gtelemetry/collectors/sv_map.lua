@@ -49,6 +49,18 @@ function GTelemetry.Collectors.Map.Init()
     Attribute = GTelemetry.OTLP.Attribute
 end
 
+function GTelemetry.Collectors.Map.Undo()
+    if not _initialized then return end
+    _initialized = false
+    hook.Remove("InitPostEntity", "GTelemetry_MapInit")
+    _startTimeNano = nil
+    MakeGauge = nil
+    MakeDataPoint = nil
+    MakeSum = nil
+    MakeCumulativeDataPoint = nil
+    Attribute = nil
+end
+
 --- Collect map and server info metrics.
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Map.Collect()

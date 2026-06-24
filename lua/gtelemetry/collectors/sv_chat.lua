@@ -46,6 +46,23 @@ function GTelemetry.Collectors.Chat.Init()
     GTelemetry.Debug("Chat collector initialized")
 end
 
+function GTelemetry.Collectors.Chat.Undo()
+    if not _initialized then return end
+    _initialized = false
+
+    hook.Remove("PlayerSay", "GTelemetry_ChatTracker")
+    hook.Remove("ULibCommandCalled", "GTelemetry_ULXTracker")
+    hook.Remove("SAM.PlayerCommand", "GTelemetry_SAMTracker")
+
+    _chatMessages = 0
+    _adminCommands = 0
+    _startTimeNano = nil
+    MakeSum = nil
+    MakeCumulativeDataPoint = nil
+
+    GTelemetry.Debug("Chat collector stopped")
+end
+
 --- Collect chat and admin metrics.
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Chat.Collect()

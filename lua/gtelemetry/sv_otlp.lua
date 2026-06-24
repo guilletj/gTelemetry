@@ -22,9 +22,9 @@ local pairs = pairs
 local ipairs = ipairs
 local math_floor = math.floor
 
--- os.time() gives epoch seconds (accurate, no drift)
--- SysTime() gives high-res time, used only for fractional seconds
--- This avoids drift between SysTime() and wall clock over long uptimes
+-- Capture SysTime at module load to align with os.time() epoch.
+-- This eliminates the ±1s jitter from misaligned integer-second boundaries.
+local _sysTimeStart = SysTime()
 
 -- Health counters exposed to sv_server for metric emission
 GTelemetry.OTLP.CollectionErrors = 0
@@ -53,10 +53,9 @@ local _isCollecting = false
 -- the fractional sub-second part, preventing long-term timestamp drift.
 -- @return string nanosecond timestamp
 function GTelemetry.OTLP.GetTimeNano()
-    local sysNow = SysTime()
-    local sysFrac = sysNow % 1
-    local epochSeconds = os_time()
-    return string_format("%.0f", (epochSeconds + sysFrac) * 1e9)
+    local now = SysTime()
+    local epochSeconds = os_time() + (now - _sysTimeStart)
+    return string_format("%.0f", epochSeconds * 1e9)
 end
 
 --- Create an OTLP attribute object.
@@ -71,7 +70,7 @@ function GTelemetry.OTLP.Attribute(key, value)
         -- Check if finite, then if integer or float
         if value < math.huge and value > -math.huge then
             if value == math_floor(value) then
-                otlpValue = {intValue = tostring(value)}
+                otlpValue = {intValue = string_format("%.0f", value)}
             else
                 otlpValue = {doubleValue = value}
             end
@@ -100,7 +99,7 @@ function GTelemetry.OTLP.MakeDataPoint(value, attributes)
     -- Set value type (NaN/Inf fall back to int = 0 for JSON safety)
     if value < math.huge and value > -math.huge then
         if value == math_floor(value) and value < 1e15 and value > -1e15 then
-            dp.asInt = tostring(value)
+            dp.asInt = string_format("%.0f", value)
         else
             dp.asDouble = value
         end

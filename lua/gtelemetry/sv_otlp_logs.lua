@@ -51,7 +51,7 @@ function GTelemetry.OTLP.Logs.Attribute(key, value)
     if valType == "number" then
         if value < math.huge and value > -math.huge then
             if value == math_floor(value) then
-                otlpValue = {intValue = tostring(value)}
+                otlpValue = {intValue = string_format("%.0f", value)}
             else
                 otlpValue = {doubleValue = value}
             end
@@ -190,17 +190,22 @@ function GTelemetry.OTLP.Logs.Flush()
     end
     _isFlushing = true
 
-    local ok, err = pcall(function()
-        local records = _logBuffer
-        _logBuffer = {}
-        _bufferSize = 0
+    local records = _logBuffer
+    _logBuffer = {}
+    _bufferSize = 0
 
+    local ok, err = pcall(function()
         local jsonBody = GTelemetry.OTLP.Logs.BuildPayload(records)
         GTelemetry.OTLP.Logs.Send(jsonBody)
     end)
 
     if not ok then
         GTelemetry.Warn("Log flush failed: " .. tostring(err))
+        -- Re-insert records on failure to avoid data loss
+        for _, v in ipairs(records) do
+            table_insert(_logBuffer, v)
+        end
+        _bufferSize = #_logBuffer
     end
     _isFlushing = false
 end

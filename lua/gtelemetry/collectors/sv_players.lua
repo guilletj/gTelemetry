@@ -38,8 +38,8 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
     if not _playerData[steamID] then
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
     end
-    local fps = net.ReadFloat()
-    if fps then
+    local ok, fps = pcall(net.ReadFloat)
+    if ok and fps and fps > 0 then
         _playerData[steamID].fps = fps
     end
 end)
@@ -108,6 +108,26 @@ function GTelemetry.Collectors.Players.Init()
 
 end
 
+--- Remove all hooks registered by this collector and clear state.
+function GTelemetry.Collectors.Players.Undo()
+    if not _initialized then return end
+    _initialized = false
+
+    hook.Remove("PlayerDeath", "GTelemetry_PlayerDeath")
+    hook.Remove("PlayerInitialSpawn", "GTelemetry_PlayerConnect")
+    hook.Remove("PlayerDisconnected", "GTelemetry_PlayerDisconnect")
+
+    _playerData = {}
+    _startTimeNano = nil
+    MakeGauge = nil
+    MakeDataPoint = nil
+    MakeSum = nil
+    MakeCumulativeDataPoint = nil
+    Attribute = nil
+
+    GTelemetry.Debug("Players collector stopped")
+end
+
 --- Collect player metrics.
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Players.Collect()
@@ -128,52 +148,51 @@ function GTelemetry.Collectors.Players.Collect()
     local curTime = CurTime()
 
     for _, ply in ipairs(players) do
-        if not IsValid(ply) then continue end
+        if IsValid(ply) then
+            if ply:IsBot() then
+                botCount = botCount + 1
+            else
+                local steamID = ply:SteamID()
+                local playerName = ply:Nick()
+                local ping = ply:Ping()
+                totalPing = totalPing + ping
 
-        if ply:IsBot() then
-            botCount = botCount + 1
-            continue
-        end
+                local attrs = {
+                    Attribute("player.name", playerName),
+                    Attribute("player.steam_id", steamID),
+                }
 
-        local steamID = ply:SteamID()
-        local playerName = ply:Nick()
-        local ping = ply:Ping()
-        totalPing = totalPing + ping
+                -- Per-player ping
+                pingPoints[#pingPoints + 1] = MakeDataPoint(ping, attrs)
 
-        local attrs = {
-            Attribute("player.name", playerName),
-            Attribute("player.steam_id", steamID),
-        }
+                -- Per-player data from tracking table
+                local data = _playerData[steamID]
+                if data then
+                    -- Client FPS (if received)
+                    if data.fps > 0 then
+                        fpsPoints[#fpsPoints + 1] = MakeDataPoint(math_Round(data.fps, 1), attrs)
+                    end
 
-        -- Per-player ping
-        pingPoints[#pingPoints + 1] = MakeDataPoint(ping, attrs)
+                    -- Kills
+                    killPoints[#killPoints + 1] = MakeCumulativeDataPoint(data.kills, _startTimeNano, attrs)
 
-        -- Per-player data from tracking table
-        local data = _playerData[steamID]
-        if data then
-            -- Client FPS (if received)
-            if data.fps > 0 then
-                fpsPoints[#fpsPoints + 1] = MakeDataPoint(math_Round(data.fps, 1), attrs)
-            end
+                    -- Deaths
+                    deathPoints[#deathPoints + 1] = MakeCumulativeDataPoint(data.deaths, _startTimeNano, attrs)
 
-            -- Kills
-            killPoints[#killPoints + 1] = MakeCumulativeDataPoint(data.kills, _startTimeNano, attrs)
+                    -- Connection time
+                    local connTime = curTime - data.connectTime
+                    connectionPoints[#connectionPoints + 1] = MakeDataPoint(math_Round(connTime, 1), attrs)
 
-            -- Deaths
-            deathPoints[#deathPoints + 1] = MakeCumulativeDataPoint(data.deaths, _startTimeNano, attrs)
-
-            -- Connection time
-            local connTime = curTime - data.connectTime
-            connectionPoints[#connectionPoints + 1] = MakeDataPoint(math_Round(connTime, 1), attrs)
-
-            -- Load time (reported once, after first spawn)
-            if data.loadTime then
-                if data.loadTime > 0 then
-                    loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
+                    -- Load time (reported once, after first spawn)
+                    if data.loadTime then
+                        if data.loadTime > 0 then
+                            loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
+                        end
+                    elseif curTime - data.connectTime > _clientLoadTimeout then
+                        data.loadTime = -1
+                        GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
+                    end
                 end
-            elseif curTime - data.connectTime > _clientLoadTimeout then
-                data.loadTime = -1
-                GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
             end
         end
     end

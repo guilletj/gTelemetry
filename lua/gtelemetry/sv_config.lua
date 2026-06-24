@@ -324,8 +324,10 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_Collect") then
             timer.Remove("GTelemetry_Collect")
         end
-        if GTelemetry.Collectors.Network and GTelemetry.Collectors.Network.Undo then
-            GTelemetry.Collectors.Network.Undo()
+        for _, collector in pairs(GTelemetry.Collectors) do
+            if collector.Undo then
+                pcall(collector.Undo)
+            end
         end
     end
 end, "gtelemetry_enabled_change")
@@ -358,5 +360,10 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
         end
     end
 end, "gtelemetry_log_enabled_change")
+
+-- Listen for bLogs mode changes
+cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
+    GTelemetry.Log("bLogs integration mode changed to: " .. newVal .. " — toggle gtelemetry_log_enabled to apply")
+end, "gtelemetry_log_blogs_mode_change")
 
 

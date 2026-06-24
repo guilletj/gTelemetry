@@ -110,6 +110,15 @@ function GTelemetry.Collectors.Entities.Init()
     Attribute = GTelemetry.OTLP.Attribute
 end
 
+function GTelemetry.Collectors.Entities.Undo()
+    if not _initialized then return end
+    _initialized = false
+    MakeGauge = nil
+    MakeDataPoint = nil
+    Attribute = nil
+    _cycleCount = 0
+end
+
 --- Collect entity count metrics.
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Entities.Collect()
@@ -118,8 +127,8 @@ function GTelemetry.Collectors.Entities.Collect()
     -- Skip collection per gtelemetry_entities_interval to reduce CPU on large maps
     local skipEvery = GTelemetry.Config.GetEntitiesInterval()
     if skipEvery > 1 then
-        _cycleCount = (_cycleCount + 1) % (skipEvery * 1000)
-        if _cycleCount % skipEvery ~= 0 then
+        _cycleCount = (_cycleCount + 1) % skipEvery
+        if _cycleCount ~= 1 then
             return nil
         end
     end
@@ -137,38 +146,38 @@ function GTelemetry.Collectors.Entities.Collect()
     local physicsCount = 0
 
     for _, ent in ipairs(allEnts) do
-        if not IsValid(ent) then continue end
+        if IsValid(ent) then
+            local class = ent:GetClass()
+            local etype = ClassifyEntity(ent, class)
 
-        local class = ent:GetClass()
-        local etype = ClassifyEntity(ent, class)
+            typeCounts[etype] = (typeCounts[etype] or 0) + 1
 
-        typeCounts[etype] = (typeCounts[etype] or 0) + 1
-
-        -- Physics objects (only check classes that can have physics)
-        if EntityHasPhysics(class) then
-            local phys = ent:GetPhysicsObject()
-            if IsValid(phys) then
-                physicsCount = physicsCount + 1
-            end
-        end
-
-        -- Per-player ownership tracking
-        if trackPerPlayer then
-            local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
-            if not IsValid(owner) then
-                owner = ent.GetCreator and ent:GetCreator()
-            end
-
-            if IsValid(owner) and owner:IsPlayer() then
-                local sid = owner:SteamID()
-                if not perPlayer[sid] then
-                    perPlayer[sid] = { name = owner:Nick(), types = {}, others = {} }
+            -- Physics objects (only check classes that can have physics)
+            if EntityHasPhysics(class) then
+                local ok, phys = pcall(ent.GetPhysicsObject, ent)
+                if ok and IsValid(phys) then
+                    physicsCount = physicsCount + 1
                 end
-                if etype == ENTITY_OTHER then
-                    perPlayer[sid].others[class] = (perPlayer[sid].others[class] or 0) + 1
-                else
-                    local name = TypeName(etype)
-                    perPlayer[sid].types[name] = (perPlayer[sid].types[name] or 0) + 1
+            end
+
+            -- Per-player ownership tracking
+            if trackPerPlayer then
+                local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
+                if not IsValid(owner) then
+                    owner = ent.GetCreator and ent:GetCreator()
+                end
+
+                if IsValid(owner) and owner:IsPlayer() then
+                    local sid = owner:SteamID()
+                    if not perPlayer[sid] then
+                        perPlayer[sid] = { name = owner:Nick(), types = {}, others = {} }
+                    end
+                    if etype == ENTITY_OTHER then
+                        perPlayer[sid].others[class] = (perPlayer[sid].others[class] or 0) + 1
+                    else
+                        local name = TypeName(etype)
+                        perPlayer[sid].types[name] = (perPlayer[sid].types[name] or 0) + 1
+                    end
                 end
             end
         end

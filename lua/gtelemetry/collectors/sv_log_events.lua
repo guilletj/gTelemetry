@@ -22,6 +22,17 @@ local tostring = tostring
 local AddLog = nil
 local Attribute = nil
 
+local table_insert = table.insert
+
+local function safeConcat(t, sep)
+    if not t then return "" end
+    local parts = {}
+    for _, v in ipairs(t) do
+        parts[#parts + 1] = tostring(v)
+    end
+    return table.concat(parts, sep or " ")
+end
+
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
 local SEVERITY_ERROR = 17
@@ -178,7 +189,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- ULX
     hook.Add("ULibCommandCalled", "GTelemetry_LogULX", function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = args and table.concat(args, " ") or ""
+        local argsStr = args and safeConcat(args) or ""
         local body = "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -189,7 +200,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- SAM (current hook: SAM.RanCommand)
     hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args, cmd)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -200,7 +211,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- SAM fallback (older versions)
     hook.Add("SAM.PlayerCommand", "GTelemetry_LogSAMLegacy", function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -211,7 +222,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- FAdmin (multiple hook names for version compat)
     hook.Add("FAdmin_CommandCalled", "GTelemetry_LogFAdmin", function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -221,7 +232,7 @@ function GTelemetry.Collectors.LogEvents.Init()
 
     hook.Add("FAdmin.Server.PlayerCommand", "GTelemetry_LogFAdmin_Server", function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -231,7 +242,7 @@ function GTelemetry.Collectors.LogEvents.Init()
 
     hook.Add("FAdmin_OnCommandExecuted", "GTelemetry_LogFAdmin_Exec", function(ply, cmd, args, results)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -242,7 +253,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- xAdmin free version (pre-execution)
     hook.Add("xAdminCanRunCommand", "GTelemetry_LogxAdmin", function(ply, cmd, args, fromConsole)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -253,7 +264,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- xAdmin paid version (post-execution)
     hook.Add("xAdminCommandRun", "GTelemetry_LogxAdminPaid", function(ply, target, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = type(args) == "table" and table.concat(args, " ") or tostring(args)
+        local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
@@ -397,7 +408,7 @@ function GTelemetry.Collectors.LogEvents.Init()
             Attribute("log.source", "system"),
             Attribute("log.event", "server_stop"),
         })
-    end)
+    end, 10)
 
     GTelemetry.Debug("LogEvents collector initialized")
 end
