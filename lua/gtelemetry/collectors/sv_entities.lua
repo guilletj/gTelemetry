@@ -32,6 +32,18 @@ local ENTITY_CONSTRAINT = 8
 local ENTITY_EFFECT = 9
 local ENTITY_OTHER = 10
 
+local _typeNames = {
+    [ENTITY_PROPS] = "prop",
+    [ENTITY_RAGDOLL] = "ragdoll",
+    [ENTITY_NPC] = "npc",
+    [ENTITY_WEAPON] = "weapon",
+    [ENTITY_VEHICLE] = "vehicle",
+    [ENTITY_DOOR] = "door",
+    [ENTITY_SCRIPTED] = "scripted_ent",
+    [ENTITY_CONSTRAINT] = "constraint",
+    [ENTITY_EFFECT] = "effect",
+}
+
 -- Entity classes that NEVER have physics objects (blacklist for GetPhysicsObject optimization)
 local _noPhysicsPrefix = {
     env_ = true,
@@ -55,10 +67,14 @@ local _noPhysicsPrefix = {
 -- @param class string pre-fetched class name
 -- @return number entity type constant
 local function ClassifyEntity(ent, class)
-    if string_StartWith(class, "prop_physics") or class == "prop_dynamic" then
+    if string_StartWith(class, "prop_physics") then
         return ENTITY_PROPS
     elseif class == "prop_ragdoll" then
         return ENTITY_RAGDOLL
+    elseif string_StartWith(class, "prop_door") then
+        return ENTITY_DOOR
+    elseif string_StartWith(class, "prop_") then
+        return ENTITY_PROPS
     elseif string_StartWith(class, "npc_") then
         return ENTITY_NPC
     elseif ent:IsWeapon() then
@@ -88,18 +104,7 @@ local function EntityHasPhysics(class)
 end
 
 local function TypeName(t)
-    local names = {
-        [ENTITY_PROPS] = "prop",
-        [ENTITY_RAGDOLL] = "ragdoll",
-        [ENTITY_NPC] = "npc",
-        [ENTITY_WEAPON] = "weapon",
-        [ENTITY_VEHICLE] = "vehicle",
-        [ENTITY_DOOR] = "door",
-        [ENTITY_SCRIPTED] = "scripted_ent",
-        [ENTITY_CONSTRAINT] = "constraint",
-        [ENTITY_EFFECT] = "effect",
-    }
-    return names[t] or "other"
+    return _typeNames[t] or "other"
 end
 
 function GTelemetry.Collectors.Entities.Init()

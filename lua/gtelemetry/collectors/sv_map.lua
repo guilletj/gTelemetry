@@ -42,6 +42,7 @@ function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+    _mapChanges = 0
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
