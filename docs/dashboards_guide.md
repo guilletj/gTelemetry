@@ -10,7 +10,7 @@ When Alloy converts OTLP metrics to Prometheus via `otelcol.exporter.prometheus`
 
 - **Dots** (`.`) become underscores (`_`)
 - **Counters** (Sum + monotonic) get a `_total` suffix
-- **Unit suffixes** are appended for recognized OTLP units (e.g., `_seconds`, `_milliseconds`, `_bytes`)
+- **Unit suffixes** are appended for recognized OTLP units (e.g., `_seconds`, `_milliseconds`, `_bytes`, `_hz`, `_percent`)
 
 > If `add_metric_suffixes` is enabled (default), the Prometheus name may differ from the OTLP name shown in `docs/metrics_reference.md`. Use the Prometheus name when writing queries.
 
@@ -26,6 +26,9 @@ When Alloy converts OTLP metrics to Prometheus via `otelcol.exporter.prometheus`
 | `gmod.hooks.think_time` | Gauge | `s` | `gmod_hooks_think_time_seconds` |
 | `gmod.chat.messages` | Sum | `{messages}` | `gmod_chat_messages_total` |
 | `gmod.darkrp.money_total` | Gauge | `{currency}` | `gmod_darkrp_money_total` |
+| `gmod.server.tickrate` | Gauge | `Hz` | `gmod_server_tickrate_hz` |
+| `gmod.network.packet_loss_avg` | Gauge | `%` | `gmod_network_packet_loss_avg_percent` |
+| `gmod.network.packet_loss` | Gauge | `%` | `gmod_network_packet_loss_percent` |
 | `gmod.telemetry.collection_errors` | Sum | `{errors}` | `gmod_telemetry_collection_errors_total` |
 
 > **Tip**: Open Grafana's **Explore** tab and type `gmod_` to see all available metric names with their labels.
@@ -38,6 +41,8 @@ Apply these in PromQL when the default unit is not convenient for your dashboard
 
 | Source unit | Prometheus suffix | To display as | PromQL transform |
 |-------------|-------------------|---------------|------------------|
+| hertz | `_hz` | (already hz) | — |
+| percent | `_percent` | (already percent) | — |
 | seconds | `_seconds` | milliseconds | `<metric> * 1000` |
 | seconds | `_seconds` | minutes | `<metric> / 60` |
 | seconds | `_seconds` | hours | `<metric> / 3600` |
@@ -85,7 +90,7 @@ gmod_server_tick_duration
 
 #### Tick Rate
 ```promql
-gmod_server_tickrate
+gmod_server_tickrate_hz
 ```
 | Property | Value |
 |----------|-------|
@@ -316,7 +321,7 @@ gmod_network_active_receivers
 
 #### Average Packet Loss
 ```promql
-gmod_network_packet_loss_avg
+gmod_network_packet_loss_avg_percent
 ```
 | Property | Value |
 |----------|-------|
@@ -326,7 +331,7 @@ gmod_network_packet_loss_avg
 
 #### Per-Player Packet Loss
 ```promql
-gmod_network_packet_loss
+gmod_network_packet_loss_percent
 ```
 | Property | Value |
 |----------|-------|
