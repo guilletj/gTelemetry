@@ -31,6 +31,14 @@ local Attribute = nil
 util.AddNetworkString("GTelemetry_ClientData")
 util.AddNetworkString("GTelemetry_ClientReady")
 
+-- Clean up player data on disconnect (always active — net.Receive handlers
+-- are also permanent, so this prevents _playerData from leaking entries
+-- when telemetry is toggled off and on).
+hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
+    if not IsValid(ply) then return end
+    _playerData[ply:SteamID()] = nil
+end)
+
 net.Receive("GTelemetry_ClientData", function(len, ply)
     if not IsValid(ply) then return end
     if ply:IsBot() then return end
@@ -87,8 +95,9 @@ function GTelemetry.Collectors.Players.Init()
         end
     end)
 
-    -- Track player connections
+    -- Track player connections (skip bots — they don't send client data)
     hook.Add("PlayerInitialSpawn", "GTelemetry_PlayerConnect", function(ply)
+        if ply:IsBot() then return end
         local steamID = ply:SteamID()
         _playerData[steamID] = _playerData[steamID] or {
             fps = 0,
@@ -100,12 +109,6 @@ function GTelemetry.Collectors.Players.Init()
         }
     end)
 
-    -- Clean up on disconnect
-    hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
-        local steamID = ply:SteamID()
-        _playerData[steamID] = nil
-    end)
-
 end
 
 --- Remove all hooks registered by this collector and clear state.
@@ -115,7 +118,6 @@ function GTelemetry.Collectors.Players.Undo()
 
     hook.Remove("PlayerDeath", "GTelemetry_PlayerDeath")
     hook.Remove("PlayerInitialSpawn", "GTelemetry_PlayerConnect")
-    hook.Remove("PlayerDisconnected", "GTelemetry_PlayerDisconnect")
 
     _playerData = {}
     _startTimeNano = nil

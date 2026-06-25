@@ -182,7 +182,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                 resource = {
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
-                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.5"),
+                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.6"),
                         GTelemetry.OTLP.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
                         GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
@@ -192,7 +192,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                     {
                         scope = {
                             name = "gTelemetry",
-                            version = GTelemetry.Version or "1.5.5",
+                            version = GTelemetry.Version or "1.5.6",
                         },
                         metrics = metrics,
                     },
@@ -239,8 +239,10 @@ function GTelemetry.OTLP.Send(jsonBody)
 
         success = function(code, body, respHeaders)
             if code >= 200 and code < 300 then
-                _backoffAttempts = 0
-                _nextSendTime = 0
+                if SysTime() >= _nextSendTime then
+                    _backoffAttempts = 0
+                    _nextSendTime = 0
+                end
                 GTelemetry.Debug("Metrics sent successfully (HTTP " .. code .. ")")
             else
                 _backoffAttempts = _backoffAttempts + 1
