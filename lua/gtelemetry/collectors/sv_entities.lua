@@ -49,9 +49,9 @@ local _typeNames = {
 -- Normal table is fine (<200 unique classes per map).
 local _classCache = {}
 
--- Non-physics prefix pattern. 'p' prefix disambiguated in EntityHasPhysics
--- (prop_ has physics, point_/path_ don't).
-local _physicsNoMatch = "^[aeilmst]"
+-- Non-physics prefix pattern. 'p' and 's' prefixes disambiguated in EntityHasPhysics
+-- (prop_/sent_ have physics, point_/path_/scene_/shadow_/sprite_ don't).
+local _physicsNoMatch = "^[aeilmt]"
 
 --- Classify an entity into a numeric type. Results cached by class string.
 -- @param ent Entity
@@ -91,14 +91,15 @@ local function ClassifyEntity(ent, class)
 end
 
 --- Check if an entity class may have a physics object (avoids expensive GetPhysicsObject call on known non-physics entities).
--- Single regex for 8 non-physics prefixes + explicit disambiguation for 'p' prefix
--- (point_/path_ have no physics, prop_ does).
+-- Single regex for 8 non-physics prefixes + explicit disambiguation for 'p' and 's' prefixes
+-- (point_/path_ have no physics, prop_ does; scene_/shadow_/sprite_ have no physics, sent_ does).
 -- Matches: env_, info_, ai_, logic_, item_, math_, scene_, shadow_, sprite_, light_, trigger_, point_, path_
 -- @param class string class name
 -- @return boolean
 local function EntityHasPhysics(class)
     if string_match(class, _physicsNoMatch) then return false end
     if string_StartWith(class, "point_") or string_StartWith(class, "path_") then return false end
+    if string_StartWith(class, "scene_") or string_StartWith(class, "shadow_") or string_StartWith(class, "sprite_") then return false end
     return true
 end
 

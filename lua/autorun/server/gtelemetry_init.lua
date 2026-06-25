@@ -35,9 +35,9 @@ function GTelemetry.PrintBanner()
         MsgC(cyan, "[gTelemetry] ", purple, "GMod Telemetry (v" .. GTelemetry.Version .. ")\n")
         MsgC(white, "Desarrollado por: ", yellow, "Edyone ", white, "para ", cyan, "Alienhost\n")
         MsgC(gray, "--------------------------------------------------\n")
-        MsgC(white, "🌐 Web:     ", cyan, "https://alienhost.net\n")
-        MsgC(white, "💬 Discord: ", cyan, "https://discord.gg/alienhost\n")
-        MsgC(white, "💻 GitHub:  ", cyan, "https://github.com/Edyone\n")
+        MsgC(white, "[WEB]     ", cyan, "https://alienhost.net\n")
+        MsgC(white, "[DISCORD] ", cyan, "https://discord.gg/alienhost\n")
+        MsgC(white, "[GITHUB]  ", cyan, "https://github.com/Edyone\n")
         MsgC(cyan, "==================================================\n\n")
     else
         local sep = string.rep("=", 50)
@@ -193,7 +193,7 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
         GTelemetry.OTLP.CollectAndSend()
     end
 
-    if GTelemetry.Config.IsLogEnabled() then
+    if GTelemetry.Config.IsLogEnabled() and GTelemetry.OTLP.Logs then
         GTelemetry.Debug("Server shutting down, flushing logs...")
         GTelemetry.OTLP.Logs.Flush()
     end

@@ -25,6 +25,7 @@ local SEVERITY_ERROR = 17
 local AddLog = nil
 local Attribute = nil
 local tostring = tostring
+local table_concat = table.concat
 local safeConcat = GTelemetry.Util.safeConcat
 
 function GTelemetry.Collectors.BLogs.IsAvailable()
@@ -45,9 +46,7 @@ function GTelemetry.Collectors.BLogs.Init()
         return
     end
 
-    AddLog = function(severity, text, body, attrs)
-        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
-    end
+    AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
 
     local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
@@ -276,9 +275,7 @@ local _wrappedModules = nil -- { mod = originalFunction } for fallback path
 function GTelemetry.Collectors.BLogs.Interceptor.Install()
     if _interceptorActive then return end
 
-    AddLog = AddLog or function(severity, text, body, attrs)
-        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
-    end
+    AddLog = AddLog or GTelemetry.OTLP.Logs.AddLog
     Attribute = Attribute or GTelemetry.OTLP.Attribute
 
     local ok, found = pcall(function()
@@ -381,7 +378,7 @@ function GTelemetry.Collectors.BLogs.Interceptor.OnLog(self, phraseKey, ...)
 
     local body = "[bLogs/" .. category .. "/" .. name .. "] " .. tostring(phraseKey)
     if #parts > 0 then
-        body = body .. ": " .. table.concat(parts, " | ")
+        body = body .. ": " .. table_concat(parts, " | ")
     end
 
     AddLog(SEVERITY_INFO, "INFO", body, {

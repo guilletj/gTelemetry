@@ -43,6 +43,10 @@ function GTelemetry.Collectors.Chat.Init()
         _adminCommands = _adminCommands + 1
     end)
 
+    hook.Add("SAM.RanCommand", "GTelemetry_SAMTracker_Ran", function(ply, cmd_name, args, cmd)
+        _adminCommands = _adminCommands + 1
+    end)
+
     GTelemetry.Debug("Chat collector initialized")
 end
 
@@ -53,6 +57,7 @@ function GTelemetry.Collectors.Chat.Undo()
     hook.Remove("PlayerSay", "GTelemetry_ChatTracker")
     hook.Remove("ULibCommandCalled", "GTelemetry_ULXTracker")
     hook.Remove("SAM.PlayerCommand", "GTelemetry_SAMTracker")
+    hook.Remove("SAM.RanCommand", "GTelemetry_SAMTracker_Ran")
 
     _chatMessages = 0
     _adminCommands = 0

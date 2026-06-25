@@ -36,9 +36,7 @@ function GTelemetry.Collectors.LogEvents.Init()
         return
     end
 
-    AddLog = function(severity, text, body, attrs)
-        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
-    end
+    AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
 
     -- Local ref for perf

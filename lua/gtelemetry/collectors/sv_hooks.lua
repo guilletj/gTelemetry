@@ -76,7 +76,7 @@ function GTelemetry.Collectors.Hooks.Init()
     end, -10)
 
     -- Track Lua errors
-    hook.Add("OnLuaError", "GTelemetry_LuaErrors", function(error, realm, stack, name, id)
+    hook.Add("OnLuaError", "GTelemetry_LuaErrors", function(...)
         _luaErrors = _luaErrors + 1
     end)
 

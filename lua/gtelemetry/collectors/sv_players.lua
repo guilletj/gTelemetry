@@ -62,7 +62,7 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
     end
     local data = _playerData[steamID]
-    if data and (not data.loadTime or data.loadTime == -1) then
+    if not data.loadTime or data.loadTime == -1 then
         data.loadTime = math_Round(SysTime() - data.loadStart, 2)
     end
 end)

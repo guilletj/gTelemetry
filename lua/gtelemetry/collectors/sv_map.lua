@@ -71,7 +71,8 @@ function GTelemetry.Collectors.Map.Collect()
     local metrics = {}
 
     local currentMap = game.GetMap() or "unknown"
-    local gamemodeName = gmod.GetGamemode() and gmod.GetGamemode().Name or "unknown"
+    local gm = gmod.GetGamemode()
+    local gamemodeName = gm and gm.Name or "unknown"
     local hostname = GetHostName and GetHostName() or "unknown"
     local serverIP = game.GetIPAddress and game.GetIPAddress() or "unknown"
 

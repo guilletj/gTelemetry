@@ -180,7 +180,8 @@ function GTelemetry.OTLP.BuildPayload(metrics)
     local serviceName = GTelemetry.Config.GetServiceName()
 
     if not _cachedGamemode then
-        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
+        local gm = gmod.GetGamemode()
+        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gm and gm.Name) or "unknown"
     end
 
     local payload = {
@@ -324,7 +325,6 @@ function GTelemetry.OTLP.CollectAndSend()
 
         if #allMetrics == 0 then
             GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
-            GTelemetry.Debug("Total collectors: " .. table.Count(GTelemetry.Collectors))
             return
         end
 
