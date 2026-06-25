@@ -49,6 +49,8 @@ function GTelemetry.Collectors.Map.Init()
         _mapChanges = _mapChanges + 1
         GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
     end)
+
+    GTelemetry.Collectors.Map.CountChange()
 end
 
 function GTelemetry.Collectors.Map.Undo()

@@ -16,7 +16,9 @@ local MakeDataPoint = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local _startTimeNano = nil
+local _serverStartSysTime = SysTime()
 local _initialized = false
+local SysTime = SysTime
 local math_floor = math.floor
 local math_Round = math.Round
 local math_min = math.min
@@ -30,6 +32,7 @@ function GTelemetry.Collectors.Server.Init()
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+    _serverStartSysTime = SysTime()
 end
 
 function GTelemetry.Collectors.Server.Undo()
@@ -40,6 +43,7 @@ function GTelemetry.Collectors.Server.Undo()
     MakeSum = nil
     MakeCumulativeDataPoint = nil
     _startTimeNano = nil
+    _serverStartSysTime = nil
 end
 
 --- Collect server performance metrics.
@@ -50,7 +54,7 @@ function GTelemetry.Collectors.Server.Collect()
     local metrics = {}
     local tickInterval = engine.TickInterval()
     local frameTime = FrameTime()
-    local curTime = CurTime()
+    local uptime = SysTime() - _serverStartSysTime
 
     -- Tick rate (configured)
     if tickInterval and tickInterval > 0 then
@@ -115,9 +119,9 @@ function GTelemetry.Collectors.Server.Collect()
     -- Server uptime
     metrics[#metrics + 1] = MakeGauge(
         "gmod.server.uptime",
-        "Server uptime since map load",
+        "Server uptime",
         "s",
-        {MakeDataPoint(math_Round(curTime, 1))}
+        {MakeDataPoint(math_Round(uptime, 1))}
     )
 
     -- Max players

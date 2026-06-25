@@ -13,6 +13,7 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Players = {}
 
 local ipairs = ipairs
+local SysTime = SysTime
 
 -- Per-player state tracking
 local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadStart, loadTime }
@@ -45,7 +46,7 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
     local ok, fps = pcall(net.ReadFloat)
     if ok and fps and fps > 0 then
@@ -59,7 +60,7 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
     local data = _playerData[steamID]
     if not data.loadTime or data.loadTime == -1 then
@@ -104,7 +105,7 @@ function GTelemetry.Collectors.Players.Init()
             fps = 0,
             kills = 0,
             deaths = 0,
-            connectTime = CurTime(),
+            connectTime = SysTime(),
             loadStart = SysTime(),
             loadTime = nil,
         }
@@ -149,7 +150,7 @@ function GTelemetry.Collectors.Players.Collect(players)
     local connectionPoints = {}
     local loadTimePoints = {}
 
-    local curTime = CurTime()
+    local curTime = SysTime()
 
     for _, ply in ipairs(players) do
         if IsValid(ply) then

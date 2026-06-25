@@ -307,9 +307,9 @@ function GTelemetry.Collectors.BLogs.Interceptor.Install()
         _restoreKey = key
 
         target[key] = function(self, ...)
-            local results = {_origLogPhrase(self, ...)}
+            local ok, r1, r2, r3 = pcall(_origLogPhrase, self, ...)
             pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, self, ...)
-            return unpack(results)
+            if ok then return r1, r2, r3 end
         end
 
         return true
@@ -341,18 +341,18 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
             entry.LogPhrase = mod.LogPhrase
             local orig = mod.LogPhrase
             mod.LogPhrase = function(innerSelf, ...)
-                local innerResults = {orig(innerSelf, ...)}
+                local ok, r1, r2, r3 = pcall(orig, innerSelf, ...)
                 pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
-                return unpack(innerResults)
+                if ok then return r1, r2, r3 end
             end
         end
         if type(mod.Phrase) == "function" then
             entry.Phrase = mod.Phrase
             local orig = mod.Phrase
             mod.Phrase = function(innerSelf, ...)
-                local innerResults = {orig(innerSelf, ...)}
+                local ok, r1, r2, r3 = pcall(orig, innerSelf, ...)
                 pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
-                return unpack(innerResults)
+                if ok then return r1, r2, r3 end
             end
         end
         if next(entry) then

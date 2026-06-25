@@ -174,12 +174,8 @@ function GTelemetry.OTLP.Logs.Flush()
     end
 
     if not success or not result then
-        local newRecords = _logBuffer
         _logBuffer = records
-        for _, v in ipairs(newRecords) do
-            table_insert(_logBuffer, v)
-        end
-        _bufferSize = #_logBuffer
+        _bufferSize = #records
     end
     _isFlushing = false
 end
