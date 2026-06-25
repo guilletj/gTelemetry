@@ -109,7 +109,7 @@ function GTelemetry.OTLP.Logs.BuildPayload(logRecords)
                 resource = {
                     attributes = {
                         GTelemetry.OTLP.Logs.Attribute("service.name", serviceName),
-                        GTelemetry.OTLP.Logs.Attribute("service.version", GTelemetry.Version or "1.5.0"),
+                        GTelemetry.OTLP.Logs.Attribute("service.version", GTelemetry.Version or "1.5.5"),
                         GTelemetry.OTLP.Logs.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Logs.Attribute("gmod.map", currentMap),
                         GTelemetry.OTLP.Logs.Attribute("gmod.gamemode", _cachedGamemode),
@@ -119,7 +119,7 @@ function GTelemetry.OTLP.Logs.BuildPayload(logRecords)
                     {
                         scope = {
                             name = "gTelemetry.logs",
-                            version = GTelemetry.Version or "1.5.0",
+                            version = GTelemetry.Version or "1.5.5",
                         },
                         logRecords = logRecords,
                     },
@@ -204,14 +204,18 @@ function GTelemetry.OTLP.Logs.Flush()
 
     if not success then
         GTelemetry.Warn("Log flush failed: " .. tostring(result))
-        for _, v in ipairs(records) do
+        local newRecords = _logBuffer
+        _logBuffer = records
+        for _, v in ipairs(newRecords) do
             table_insert(_logBuffer, v)
         end
         _bufferSize = #_logBuffer
     elseif not result then
         -- Send() returned false (backoff skip) — re-insert records to avoid data loss
         GTelemetry.Debug("Log flush skipped (backoff active), re-inserting " .. #records .. " records")
-        for _, v in ipairs(records) do
+        local newRecords = _logBuffer
+        _logBuffer = records
+        for _, v in ipairs(newRecords) do
             table_insert(_logBuffer, v)
         end
         _bufferSize = #_logBuffer

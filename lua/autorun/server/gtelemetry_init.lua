@@ -17,7 +17,7 @@
 
 -- Initialize global namespace
 GTelemetry = GTelemetry or {}
-GTelemetry.Version = "1.5.0"
+GTelemetry.Version = "1.5.5"
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 
 -- Client files in autorun/client are automatically sent to the client
@@ -110,6 +110,11 @@ hook.Add("InitPostEntity", "GTelemetry_Init", function()
     if not GTelemetry.Config.IsEnabled() then
         GTelemetry.Log("Telemetry is disabled. Set gtelemetry_enabled 1 to enable.")
         return
+    end
+
+    if GetConVar("sv_hibernate_think"):GetInt() == 0 then
+        GTelemetry.Log("WARNING: sv_hibernate_think is 0 — timers will NOT fire when no players are connected.")
+        GTelemetry.Log("Set sv_hibernate_think 1 in server.cfg or add +sv_hibernate_think 1 to your launch args.")
     end
 
     GTelemetry.StartCollection()

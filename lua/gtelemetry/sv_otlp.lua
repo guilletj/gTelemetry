@@ -182,7 +182,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                 resource = {
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
-                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.0"),
+                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.5"),
                         GTelemetry.OTLP.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
                         GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
@@ -192,7 +192,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                     {
                         scope = {
                             name = "gTelemetry",
-                            version = GTelemetry.Version or "1.5.0",
+                            version = GTelemetry.Version or "1.5.5",
                         },
                         metrics = metrics,
                     },

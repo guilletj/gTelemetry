@@ -137,7 +137,8 @@ function GTelemetry.Collectors.Entities.Collect()
     local allEnts = ents.GetAll()
     local totalCount = #allEnts
 
-    local typeCounts = {}
+    local worldTypeCounts = {}
+    local playerTypeCounts = {}
 
     local perPlayer = {} -- [steamID] = { name, types: { [type] = count } }
 
@@ -150,8 +151,6 @@ function GTelemetry.Collectors.Entities.Collect()
             local class = ent:GetClass()
             local etype = ClassifyEntity(ent, class)
 
-            typeCounts[etype] = (typeCounts[etype] or 0) + 1
-
             -- Physics objects (only check classes that can have physics)
             if EntityHasPhysics(class) then
                 local ok, phys = pcall(ent.GetPhysicsObject, ent)
@@ -160,24 +159,30 @@ function GTelemetry.Collectors.Entities.Collect()
                 end
             end
 
-            -- Per-player ownership tracking
-            if trackPerPlayer then
-                local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
-                if not IsValid(owner) then
-                    owner = ent.GetCreator and ent:GetCreator()
-                end
+            -- Owner detection (always — used for world vs player breakdown)
+            local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
+            if not IsValid(owner) then
+                owner = ent.GetCreator and ent:GetCreator()
+            end
 
-                if IsValid(owner) and owner:IsPlayer() then
-                    local sid = owner:SteamID()
-                    if not perPlayer[sid] then
-                        perPlayer[sid] = { name = owner:Nick(), types = {}, others = {} }
-                    end
-                    if etype == ENTITY_OTHER then
-                        perPlayer[sid].others[class] = (perPlayer[sid].others[class] or 0) + 1
-                    else
-                        local name = TypeName(etype)
-                        perPlayer[sid].types[name] = (perPlayer[sid].types[name] or 0) + 1
-                    end
+            local isPlayerOwned = IsValid(owner) and owner:IsPlayer()
+            if isPlayerOwned then
+                playerTypeCounts[etype] = (playerTypeCounts[etype] or 0) + 1
+            else
+                worldTypeCounts[etype] = (worldTypeCounts[etype] or 0) + 1
+            end
+
+            -- Per-player ownership breakdown (gated by convar)
+            if trackPerPlayer and isPlayerOwned then
+                local sid = owner:SteamID()
+                if not perPlayer[sid] then
+                    perPlayer[sid] = { name = owner:Nick(), types = {}, others = {} }
+                end
+                if etype == ENTITY_OTHER then
+                    perPlayer[sid].others[class] = (perPlayer[sid].others[class] or 0) + 1
+                else
+                    local name = TypeName(etype)
+                    perPlayer[sid].types[name] = (perPlayer[sid].types[name] or 0) + 1
                 end
             end
         end
@@ -191,84 +196,12 @@ function GTelemetry.Collectors.Entities.Collect()
         {MakeDataPoint(totalCount)}
     )
 
-    -- Props
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.props",
-        "Number of prop entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_PROPS] or 0)}
-    )
-
-    -- Ragdolls
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.ragdolls",
-        "Number of ragdoll entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_RAGDOLL] or 0)}
-    )
-
-    -- NPCs
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.npcs",
-        "Number of NPC entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_NPC] or 0)}
-    )
-
     -- Players (entity count)
     metrics[#metrics + 1] = MakeGauge(
         "gmod.entities.players",
         "Number of player entities",
         "{entities}",
         {MakeDataPoint(player.GetCount())}
-    )
-
-    -- Weapons
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.weapons",
-        "Number of weapon entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_WEAPON] or 0)}
-    )
-
-    -- Vehicles
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.vehicles",
-        "Number of vehicle entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_VEHICLE] or 0)}
-    )
-
-    -- Doors
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.doors",
-        "Number of door entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_DOOR] or 0)}
-    )
-
-    -- Scripted entities (SENTs)
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.scripted_ents",
-        "Number of scripted entities (SENTs)",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_SCRIPTED] or 0)}
-    )
-
-    -- Constraints
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.constraints",
-        "Number of constraint/rope/hydraulic entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_CONSTRAINT] or 0)}
-    )
-
-    -- Effects
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.effects",
-        "Number of effect entities",
-        "{entities}",
-        {MakeDataPoint(typeCounts[ENTITY_EFFECT] or 0)}
     )
 
     -- Physics objects
@@ -278,6 +211,29 @@ function GTelemetry.Collectors.Entities.Collect()
         "{objects}",
         {MakeDataPoint(physicsCount)}
     )
+
+    -- Breakdown by type + owner
+    local ownerBreakdownPoints = {}
+    for etype, count in pairs(worldTypeCounts) do
+        ownerBreakdownPoints[#ownerBreakdownPoints + 1] = MakeDataPoint(count, {
+            Attribute("entity.type", TypeName(etype)),
+            Attribute("entity.owner", "world"),
+        })
+    end
+    for etype, count in pairs(playerTypeCounts) do
+        ownerBreakdownPoints[#ownerBreakdownPoints + 1] = MakeDataPoint(count, {
+            Attribute("entity.type", TypeName(etype)),
+            Attribute("entity.owner", "player"),
+        })
+    end
+    if #ownerBreakdownPoints > 0 then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.entities.by_type",
+            "Number of entities grouped by type and owner (world vs player)",
+            "{entities}",
+            ownerBreakdownPoints
+        )
+    end
 
     -- Per-player entity ownership breakdown
     if trackPerPlayer then

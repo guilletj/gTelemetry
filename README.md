@@ -24,7 +24,7 @@ Monitor server performance, players, entities, network, Lua errors, and more fro
 
 ## Features
 
-- **~59 metrics** across 8 collectors + **Loki log export** (optional)
+- **~45 metrics** across 8 collectors + **Loki log export** (optional)
 - **27+ log event types** — chat, player join/leave, deaths, Lua errors, admin commands (ULX, SAM, FAdmin, xAdmin), map changes, server start/stop, spawns, item pickups
 - **Event-driven logging** — hooks capture events in real-time with buffered flush, no polling
 - **Zero dependencies** — uses native GMod `HTTP()` function
@@ -79,11 +79,19 @@ Monitor server performance, players, entities, network, Lua errors, and more fro
     └── LICENSE
     ```
 
-2. **Required:** Start your server with `-allowlocalhttp` to allow HTTP to private IPs:
+2. **Required:** Server launch arguments:
+   - `-allowlocalhttp` — allows HTTP to private/local IPs (needed for OTLP export)
+   - `sv_hibernate_think 1` — prevents timers from pausing when no players are connected
+
+   On a dedicated server, GMod timers **only run while players are connected** by default. Without `sv_hibernate_think 1`, gTelemetry stops collecting and exporting data when the server is empty.
+
+   Example:
 
    ```
-   srcds.exe -game garrysmod +gamemode sandbox +map gm_construct -allowlocalhttp
+   srcds.exe -game garrysmod +gamemode sandbox +map gm_construct -allowlocalhttp +sv_hibernate_think 1
    ```
+
+   Alternatively, add `sv_hibernate_think 1` to your server.cfg.
 
 3. Restart the server, or run `lua_openscript autorun/server/gtelemetry_init.lua` in the console for a hot-reload.
 
@@ -105,7 +113,7 @@ All settings are managed via server ConVars — no config files. See [`docs/cvar
 | `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
 | `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle). Higher values reduce CPU on large maps |
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
-| `gtelemetry_version` | `1.5.0` | Version info (replicated to clients) |
+| `gtelemetry_version` | `1.5.5` | Version info (replicated to clients) |
 
 ### Log ConVars
 
@@ -169,6 +177,9 @@ Logs are buffered as they happen and flushed periodically. This avoids one HTTP 
 ### Example server.cfg
 
 ```
+// Required: prevents timer freeze when server is empty
+sv_hibernate_think 1
+
 // gTelemetry — metrics
 gtelemetry_enabled 1
 gtelemetry_endpoint "http://192.168.1.100:4318/v1/metrics"
@@ -225,10 +236,11 @@ Requires bLogs and GmodAdminSuite to be installed (except `off` mode). See [`doc
 
 ### Metrics not reaching Alloy
 
-1. **Check `-allowlocalhttp`**: GMod blocks HTTP to private IPs by default. Ensure your server start script includes it.
-2. **Check the endpoint**: Run `gtelemetry_debug 1` in the server console to see detailed logging. Verify the endpoint URL.
-3. **Check Alloy is running**: Open `http://<alloy-host>:12345` in a browser.
-4. **Firewall**: Ensure port 4318 is open between your GMod server and Alloy.
+1. **Check `sv_hibernate_think`**: On a dedicated server, timers stop firing when no players are connected. Ensure `sv_hibernate_think 1` is set in server.cfg or launch args. See [Installation](#installation) step 2.
+2. **Check `-allowlocalhttp`**: GMod blocks HTTP to private IPs by default. Ensure your server start script includes it.
+3. **Check the endpoint**: Run `gtelemetry_debug 1` in the server console to see detailed logging. Verify the endpoint URL.
+4. **Check Alloy is running**: Open `http://<alloy-host>:12345` in a browser.
+5. **Firewall**: Ensure port 4318 is open between your GMod server and Alloy.
 
 ### Logs not reaching Loki
 
