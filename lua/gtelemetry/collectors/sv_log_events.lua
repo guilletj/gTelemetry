@@ -265,7 +265,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- Gated behind gtelemetry_log_spawn
     -- ════════════════════════════════════════════════════════════
     hook.Add("PlayerSpawnedProp", "GTelemetry_LogSpawnProp", function(ply, model, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Prop] " .. ply:Nick() .. " spawned " .. tostring(model)
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "spawn"),
@@ -274,7 +274,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedVehicle", "GTelemetry_LogSpawnVehicle", function(ply, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local vClass = IsValid(ent) and ent:GetClass() or "unknown"
         local body = "[Vehicle] " .. ply:Nick() .. " spawned " .. vClass
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -284,7 +284,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedNPC", "GTelemetry_LogSpawnNPC", function(ply, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local npcClass = IsValid(ent) and ent:GetClass() or "unknown"
         local body = "[NPC] " .. ply:Nick() .. " spawned " .. npcClass
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -294,7 +294,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedSENT", "GTelemetry_LogSpawnSENT", function(ply, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(ent) and ent:GetClass() or "unknown"
         local body = "[SENT] " .. ply:Nick() .. " spawned " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -304,7 +304,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedSWEP", "GTelemetry_LogSpawnSWEP", function(ply, swep)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(swep) and swep:GetClass() or "unknown"
         local body = "[SWEP] " .. ply:Nick() .. " spawned " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -314,7 +314,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedRagdoll", "GTelemetry_LogSpawnRagdoll", function(ply, model, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Ragdoll] " .. ply:Nick() .. " spawned " .. tostring(model)
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "spawn"),
@@ -323,7 +323,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedEffect", "GTelemetry_LogSpawnEffect", function(ply, model, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Effect] " .. ply:Nick() .. " spawned " .. tostring(model)
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "spawn"),
@@ -335,7 +335,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- Item pickups / weapon drops (gated behind gtelemetry_log_spawn)
     -- ════════════════════════════════════════════════════════════
     hook.Add("PlayerPickupItem", "GTelemetry_LogPickup", function(ply, item)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(item) and item:GetClass() or "unknown"
         local body = ply:Nick() .. " picked up " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -345,7 +345,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerDroppedWeapon", "GTelemetry_LogDrop", function(ply, weapon)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(weapon) and weapon:GetClass() or "unknown"
         local body = ply:Nick() .. " dropped " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {

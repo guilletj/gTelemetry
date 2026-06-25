@@ -176,39 +176,39 @@ local _hookSpecs = {
         AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
     end},
     {event = "PlayerSpawnedProp", id = "gtelemetry_spawn_prop", fn = function(ply, model, ent)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Prop] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "prop")})
     end},
     {event = "PlayerSpawnedVehicle", id = "gtelemetry_spawn_vehicle", fn = function(ply, ent)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Vehicle] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "vehicle")})
     end},
     {event = "PlayerSpawnedNPC", id = "gtelemetry_spawn_npc", fn = function(ply, ent)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[NPC] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "npc")})
     end},
     {event = "PlayerSpawnedSENT", id = "gtelemetry_spawn_sent", fn = function(ply, ent)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[SENT] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "sent")})
     end},
     {event = "PlayerSpawnedSWEP", id = "gtelemetry_spawn_swep", fn = function(ply, swep)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[SWEP] " .. ply:Nick() .. " spawned " .. (IsValid(swep) and swep:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "swep")})
     end},
     {event = "PlayerSpawnedRagdoll", id = "gtelemetry_spawn_ragdoll", fn = function(ply, model, ent)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Ragdoll] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "ragdoll")})
     end},
     {event = "PlayerSpawnedEffect", id = "gtelemetry_spawn_effect", fn = function(ply, model, ent)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Effect] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "effect")})
     end},
     {event = "PlayerPickupItem", id = "gtelemetry_pickup", fn = function(ply, item)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " picked up " .. (IsValid(item) and item:GetClass() or "unknown"), {Attribute("log.source", "item"), Attribute("log.event", "pickup")})
     end},
     {event = "PlayerDroppedWeapon", id = "gtelemetry_drop", fn = function(ply, weapon)
-        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " dropped " .. (IsValid(weapon) and weapon:GetClass() or "unknown"), {Attribute("log.source", "item"), Attribute("log.event", "drop")})
     end},
     {event = "InitPostEntity", id = "gtelemetry_map", fn = function()
