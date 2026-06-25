@@ -30,6 +30,7 @@ local Attribute = nil
 -- Register net messages for client data (must be outside Init to avoid race conditions)
 util.AddNetworkString("GTelemetry_ClientData")
 util.AddNetworkString("GTelemetry_ClientReady")
+util.AddNetworkString("GTelemetry_RequestReady")
 
 -- Clean up player data on disconnect (always active — net.Receive handlers
 -- are also permanent, so this prevents _playerData from leaking entries
@@ -186,8 +187,9 @@ function GTelemetry.Collectors.Players.Collect()
                     connectionPoints[#connectionPoints + 1] = MakeDataPoint(math_Round(connTime, 1), attrs)
 
                     -- Load time (reported once, after first spawn)
+                    -- -1 sentinel means client never sent ready signal within timeout
                     if data.loadTime then
-                        if data.loadTime > 0 then
+                        if data.loadTime ~= 0 then
                             loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
                         end
                     elseif curTime - data.connectTime > _clientLoadTimeout then

@@ -71,7 +71,7 @@ function GTelemetry.Collectors.DarkRP.Collect()
 
                 -- Money
                 local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
-                totalMoney = totalMoney + (money or 0)
+                totalMoney = totalMoney + money
                 if money and money > 0 then
                     moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
                         Attribute("player.name", ply:Nick()),

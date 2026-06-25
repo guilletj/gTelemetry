@@ -16,7 +16,7 @@ All configuration is managed via server ConVars. Set them in `server.cfg` or via
 | `gtelemetry_entities_per_player` | `1` | ARCHIVE | Enable per-player entity ownership breakdown (high cardinality) |
 | `gtelemetry_entities_interval` | `1` | ARCHIVE | Collect entity metrics every N cycles (1 = every cycle) |
 | `gtelemetry_network_details` | `0` | ARCHIVE | Enable per-message-name net message breakdown (high cardinality) |
-| `gtelemetry_version` | `1.5.0` | ARCHIVE, NOTIFY, REPLICATED | Version info (replicated to clients, notified on change) |
+| `gtelemetry_version` | `1.5.6` | ARCHIVE, NOTIFY, REPLICATED | Version info (replicated to clients, notified on change) |
 
 ## Log ConVars
 

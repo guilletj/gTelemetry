@@ -292,7 +292,7 @@ function GTelemetry.OTLP.CollectAndSend()
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
                 local ok2, result = pcall(collector.Collect)
-                if ok2 and result then
+                if ok2 and type(result) == "table" then
                     local count = #result
                     GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
                     for _, metric in ipairs(result) do

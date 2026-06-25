@@ -206,7 +206,6 @@ function GTelemetry.OTLP.Logs.Flush()
         records[i + 1] = _logBuffer[_bufferStart + i]
         _logBuffer[_bufferStart + i] = nil
     end
-    _logBuffer = {}
     _bufferStart = 1
     _bufferSize = 0
 

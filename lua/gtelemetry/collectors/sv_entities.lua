@@ -164,8 +164,13 @@ function GTelemetry.Collectors.Entities.Collect()
             end
 
             -- Owner detection (always — used for world vs player breakdown)
-            local owner = type(ent.CPPIGetOwner) == "function" and ent:CPPIGetOwner()
-            if not IsValid(owner) then
+            local okOwner, owner = pcall(function()
+                if type(ent.CPPIGetOwner) == "function" then
+                    return ent:CPPIGetOwner()
+                end
+                return nil
+            end)
+            if not okOwner or not IsValid(owner) then
                 owner = ent.GetCreator and ent:GetCreator()
             end
 

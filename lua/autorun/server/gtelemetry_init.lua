@@ -99,6 +99,11 @@ function GTelemetry.StartLogCollection()
         GTelemetry._activeLogCollector = "logevents"
     end
 
+    if not GTelemetry.OTLP.Logs then
+        GTelemetry.Warn("GTelemetry.OTLP.Logs not available — log flush timer not created")
+        return
+    end
+
     local interval = GTelemetry.Config.GetLogInterval()
     timer.Create("GTelemetry_LogFlush", interval, 0, function()
         GTelemetry.OTLP.Logs.Flush()
@@ -114,7 +119,8 @@ hook.Add("InitPostEntity", "GTelemetry_Init", function()
         return
     end
 
-    if GetConVar("sv_hibernate_think"):GetInt() == 0 then
+    local hibernateCvar = GetConVar("sv_hibernate_think")
+    if hibernateCvar and hibernateCvar:GetInt() == 0 then
         GTelemetry.Log("WARNING: sv_hibernate_think is 0 — timers will NOT fire when no players are connected.")
         GTelemetry.Log("Set sv_hibernate_think 1 in server.cfg or add +sv_hibernate_think 1 to your launch args.")
     end

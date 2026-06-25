@@ -39,7 +39,7 @@ Monitor server performance, players, entities, network, Lua errors, and more fro
 - **Late-init support** — works even if loaded after map start (e.g., via `lua_openscript`)
 - **Graceful shutdown** — sends final metrics push and log flush on server shutdown
 - **Lightweight** — minimal performance impact, async HTTP sends, error-isolated collectors, configurable entity scan interval
-- **Resilient** — exponential backoff on HTTP failures (up to 2 minutes), health metrics for pipeline monitoring
+- **Resilient** — exponential backoff on HTTP failures (up to 30 seconds), health metrics for pipeline monitoring
 - **Alert-ready** — includes [ready-to-use Grafana alert rules](docs/alert_rules.md) for anomaly detection
 - **Startup banner** — displays addon version, credits, and links on server start
 

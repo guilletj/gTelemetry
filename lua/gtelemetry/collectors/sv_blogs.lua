@@ -236,10 +236,13 @@ local _hookSpecs = {
     {event = "gamemode.PostGamemodeLoaded", id = "gtelemetry_gamemode", fn = function()
         AddLog(SEVERITY_INFO, "INFO", "Gamemode loaded: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown"), {Attribute("log.source", "system"), Attribute("log.event", "gamemode_change")})
     end},
-    {event = "ShutDown", id = "gtelemetry_shutdown", fn = function()
-        AddLog(SEVERITY_WARN, "WARN", "Server shutting down", {Attribute("log.source", "system"), Attribute("log.event", "server_stop")})
-    end},
 }
+-- NOTE: ShutDown is NOT in _hookSpecs. It's registered via hook.Add() directly in _setupModule()
+-- with priority 10 to ensure it runs BEFORE the main flush hook at default priority 0.
+
+local function _shutdownHook()
+    AddLog(SEVERITY_WARN, "WARN", "Server shutting down", {Attribute("log.source", "system"), Attribute("log.event", "server_stop")})
+end
 
 local function _setupModule()
     _module = GAS.Logging:MODULE()
@@ -253,6 +256,9 @@ local function _setupModule()
         end
     end)
 
+    -- Register ShutDown directly with priority 10 so it runs BEFORE the main flush (priority 0)
+    hook.Add("ShutDown", "GTelemetry_BLogsShutdown", _shutdownHook, 10)
+
     GAS.Logging:AddModule(_module)
     GTelemetry.Debug("bLogs bridge registered " .. #_hookSpecs .. " hooks via MODULE:Hook()")
 end
@@ -261,6 +267,7 @@ local function _cleanupModule()
     for _, spec in ipairs(_hookSpecs) do
         pcall(hook.Remove, spec.event, spec.id)
     end
+    hook.Remove("ShutDown", "GTelemetry_BLogsShutdown")
     pcall(function() GAS.Logging:RemoveModule(_module) end)
     _module = nil
     GTelemetry.Debug("bLogs bridge hooks removed")
@@ -270,7 +277,6 @@ GTelemetry.Collectors.BLogs.Interceptor = {}
 
 local _interceptorActive = false
 local _origLogPhrase = nil
-local _origPhrase = nil
 local _origAddModule = nil
 local _restoreTarget = nil
 local _restoreKey = nil
@@ -342,22 +348,27 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
     GAS.Logging.AddModule = function(self, mod)
         local result = _origAddModule(self, mod)
 
+        local entry = {}
         if type(mod.LogPhrase) == "function" then
-            _wrappedModules[mod] = mod.LogPhrase
+            entry.LogPhrase = mod.LogPhrase
             local orig = mod.LogPhrase
             mod.LogPhrase = function(innerSelf, ...)
                 local innerResults = {orig(innerSelf, ...)}
                 pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
                 return unpack(innerResults)
             end
-        elseif type(mod.Phrase) == "function" then
-            _wrappedModules[mod] = mod.Phrase
+        end
+        if type(mod.Phrase) == "function" then
+            entry.Phrase = mod.Phrase
             local orig = mod.Phrase
             mod.Phrase = function(innerSelf, ...)
                 local innerResults = {orig(innerSelf, ...)}
                 pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
                 return unpack(innerResults)
             end
+        end
+        if next(entry) then
+            _wrappedModules[mod] = entry
         end
 
         return result
@@ -401,13 +412,13 @@ function GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
 
     if _wrappedModules then
         local count = 0
-        for mod, orig in pairs(_wrappedModules) do
+        for mod, entry in pairs(_wrappedModules) do
             count = count + 1
-            if type(mod.LogPhrase) == "function" and mod.LogPhrase ~= orig then
-                mod.LogPhrase = orig
+            if entry.LogPhrase and type(mod.LogPhrase) == "function" and mod.LogPhrase ~= entry.LogPhrase then
+                mod.LogPhrase = entry.LogPhrase
             end
-            if type(mod.Phrase) == "function" and mod.Phrase ~= orig then
-                mod.Phrase = orig
+            if entry.Phrase and type(mod.Phrase) == "function" and mod.Phrase ~= entry.Phrase then
+                mod.Phrase = entry.Phrase
             end
         end
         _wrappedModules = nil

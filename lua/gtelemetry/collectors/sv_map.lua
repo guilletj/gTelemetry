@@ -49,6 +49,10 @@ function GTelemetry.Collectors.Map.Init()
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
+    hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
+        _mapChanges = _mapChanges + 1
+        GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
+    end)
 end
 
 function GTelemetry.Collectors.Map.Undo()
