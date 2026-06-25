@@ -113,7 +113,7 @@ All settings are managed via server ConVars — no config files. See [`docs/cvar
 | `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
 | `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle). Higher values reduce CPU on large maps |
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
-| `gtelemetry_version` | `1.5.6` | Version info (replicated to clients) |
+| `gtelemetry_version` | `1.5.7` | Version info (replicated to clients) |
 
 ### Log ConVars
 
