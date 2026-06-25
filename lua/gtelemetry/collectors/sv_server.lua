@@ -32,6 +32,16 @@ function GTelemetry.Collectors.Server.Init()
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 end
 
+function GTelemetry.Collectors.Server.Undo()
+    if not _initialized then return end
+    _initialized = false
+    MakeGauge = nil
+    MakeDataPoint = nil
+    MakeSum = nil
+    MakeCumulativeDataPoint = nil
+    _startTimeNano = nil
+end
+
 --- Collect server performance metrics.
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Server.Collect()

@@ -85,9 +85,50 @@ GTelemetry.Config.ConVars = {
     ),
 
     version = CreateConVar(
-        "gtelemetry_version", GTelemetry.Version or "1.1.0",
+        "gtelemetry_version", GTelemetry.Version or "1.5.5",
         FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
         "Version of gTelemetry currently running."
+    ),
+
+    -- Log / Loki ConVars
+    log_enabled = CreateConVar(
+        "gtelemetry_log_enabled", "0",
+        FCVAR_ARCHIVE,
+        "Enable OTLP log collection and export to Loki via Alloy.",
+        0, 1
+    ),
+
+    log_endpoint = CreateConVar(
+        "gtelemetry_log_endpoint", "http://localhost:4318/v1/logs",
+        FCVAR_ARCHIVE + FCVAR_PROTECTED,
+        "OTLP HTTP endpoint for log export (Alloy /v1/logs or Loki /loki/api/v1/push)."
+    ),
+
+    log_interval = CreateConVar(
+        "gtelemetry_log_interval", "10",
+        FCVAR_ARCHIVE,
+        "Log flush interval in seconds.",
+        1, 300
+    ),
+
+    log_buffer_size = CreateConVar(
+        "gtelemetry_log_buffer_size", "1000",
+        FCVAR_ARCHIVE,
+        "Maximum number of log entries buffered before dropping oldest.",
+        100, 10000
+    ),
+
+    log_spawn = CreateConVar(
+        "gtelemetry_log_spawn", "0",
+        FCVAR_ARCHIVE,
+        "Enable logging of spawn events (props, NPCs, SENTs, ragdolls, effects, item pickups). May be noisy on sandbox servers.",
+        0, 1
+    ),
+
+    log_blogs_mode = CreateConVar(
+        "gtelemetry_log_blogs_mode", "off",
+        FCVAR_ARCHIVE,
+        "bLogs integration mode: off (core collectors), replace (bLogs bridge via MODULE:Hook), intercept (LogPhrase wrapper), hybrid (both). Requires bLogs + GAS except in off mode."
     ),
 }
 
@@ -157,6 +198,55 @@ end
 -- @return boolean
 function GTelemetry.Config.IsNetworkDetailsEnabled()
     return GTelemetry.Config.ConVars.network_details:GetBool()
+end
+
+--- Returns whether log collection is enabled.
+-- @return boolean
+function GTelemetry.Config.IsLogEnabled()
+    return GTelemetry.Config.ConVars.log_enabled:GetBool()
+end
+
+--- Returns the OTLP log endpoint URL.
+-- @return string
+function GTelemetry.Config.GetLogEndpoint()
+    local url = GTelemetry.Config.ConVars.log_endpoint:GetString()
+    if url == "" then
+        GTelemetry.Warn("No log endpoint configured. Set gtelemetry_log_endpoint ConVar.")
+    elseif not string_match(url, "^https?://") then
+        GTelemetry.Warn("Invalid log endpoint URL (must start with http:// or https://): " .. url)
+    end
+    return url
+end
+
+--- Returns the log flush interval in seconds.
+-- @return number
+function GTelemetry.Config.GetLogInterval()
+    return GTelemetry.Config.ConVars.log_interval:GetInt()
+end
+
+--- Returns the maximum log buffer size.
+-- @return number
+function GTelemetry.Config.GetLogBufferSize()
+    return GTelemetry.Config.ConVars.log_buffer_size:GetInt()
+end
+
+--- Returns whether spawn event logging is enabled.
+-- @return boolean
+function GTelemetry.Config.IsLogSpawnEnabled()
+    return GTelemetry.Config.ConVars.log_spawn:GetBool()
+end
+
+--- Returns whether any bLogs integration mode is active.
+-- @return boolean
+function GTelemetry.Config.IsBlogsActive()
+    local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+    return mode == "replace" or mode == "intercept" or mode == "hybrid"
+end
+
+--- Returns whether bLogs is detected and available.
+-- @return boolean
+function GTelemetry.Config.IsBlogsAvailable()
+    return GAS and GAS.Logging and type(GAS.Logging.MODULE) == "function"
 end
 
 --- Print a debug message to server console (only when debug mode is on).
@@ -234,10 +324,46 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_Collect") then
             timer.Remove("GTelemetry_Collect")
         end
-        if GTelemetry.Collectors.Network and GTelemetry.Collectors.Network.Undo then
-            GTelemetry.Collectors.Network.Undo()
+        for _, collector in pairs(GTelemetry.Collectors) do
+            if collector.Undo then
+                pcall(collector.Undo)
+            end
         end
     end
 end, "gtelemetry_enabled_change")
+
+-- Listen for log enable/disable changes
+cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
+    local enabled = newVal == "1"
+    if enabled then
+        GTelemetry.Log("Log collection enabled")
+        if GTelemetry.StartLogCollection then
+            if not timer.Exists("GTelemetry_LogFlush") then
+                GTelemetry.StartLogCollection()
+            end
+        else
+            GTelemetry.Warn("GTelemetry.StartLogCollection not available yet (modules still loading)")
+        end
+    else
+        GTelemetry.Log("Log collection disabled")
+        if timer.Exists("GTelemetry_LogFlush") then
+            timer.Remove("GTelemetry_LogFlush")
+        end
+        if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
+            if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Undo then
+                GTelemetry.Collectors.BLogs.Undo()
+            end
+        else
+            if GTelemetry.Collectors.LogEvents and GTelemetry.Collectors.LogEvents.Undo then
+                GTelemetry.Collectors.LogEvents.Undo()
+            end
+        end
+    end
+end, "gtelemetry_log_enabled_change")
+
+-- Listen for bLogs mode changes
+cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
+    GTelemetry.Log("bLogs integration mode changed to: " .. newVal .. " — toggle gtelemetry_log_enabled to apply")
+end, "gtelemetry_log_blogs_mode_change")
 
 

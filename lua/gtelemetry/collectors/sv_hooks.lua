@@ -76,6 +76,31 @@ function GTelemetry.Collectors.Hooks.Init()
     GTelemetry.Debug("Hooks collector initialized")
 end
 
+function GTelemetry.Collectors.Hooks.Undo()
+    if not _initialized then return end
+    _initialized = false
+
+    hook.Remove("Think", "GTelemetry_ThinkStart")
+    hook.Remove("Think", "GTelemetry_ThinkEnd")
+    hook.Remove("Tick", "GTelemetry_TickStart")
+    hook.Remove("Tick", "GTelemetry_TickEnd")
+    hook.Remove("OnLuaError", "GTelemetry_LuaErrors")
+
+    _thinkCount = 0
+    _tickCount = 0
+    _thinkTime = 0
+    _tickTime = 0
+    _luaErrors = 0
+    _startTimeNano = nil
+    MakeGauge = nil
+    MakeDataPoint = nil
+    MakeSum = nil
+    MakeCumulativeDataPoint = nil
+    Attribute = nil
+
+    GTelemetry.Debug("Hooks collector stopped")
+end
+
 --- Count total hooks and hooks per event from the hook table.
 -- @return number totalHooks
 -- @return table eventCounts — {[eventName] = count}

@@ -345,7 +345,7 @@ gmod.entities.total > 5000
 ### 3.4 Prop Spam
 
 ```promql
-gmod.entities.props > 3000
+gmod.entities.by_type{entity.type="prop", entity.owner="player"} > 3000
 ```
 
 | Field | Value |
@@ -363,7 +363,7 @@ gmod.entities.props > 3000
 Uncleaned ragdolls are a common cause of performance degradation over time.
 
 ```promql
-gmod.entities.ragdolls > 50
+gmod.entities.by_type{entity.type="ragdoll"} > 50
 ```
 
 | Field | Value |
@@ -401,7 +401,7 @@ gmod.physics.objects > 2000
 Too many constraints can destabilize the physics engine.
 
 ```promql
-gmod.entities.constraints > 1000
+gmod.entities.by_type{entity.type="constraint"} > 1000
 ```
 
 | Field | Value |
@@ -698,12 +698,12 @@ Stacked area chart showing entity evolution.
 
 ```promql
 {
-  gmod.entities.props,
-  gmod.entities.ragdolls,
-  gmod.entities.npcs,
-  gmod.entities.weapons,
-  gmod.entities.vehicles,
-  gmod.entities.constraints
+  gmod.entities.by_type{entity.type="prop"},
+  gmod.entities.by_type{entity.type="ragdoll"},
+  gmod.entities.by_type{entity.type="npc"},
+  gmod.entities.by_type{entity.type="weapon"},
+  gmod.entities.by_type{entity.type="vehicle"},
+  gmod.entities.by_type{entity.type="constraint"}
 }
 ```
 

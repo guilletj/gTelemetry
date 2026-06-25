@@ -22,9 +22,10 @@ local pairs = pairs
 local ipairs = ipairs
 local math_floor = math.floor
 
--- os.time() gives epoch seconds (accurate, no drift)
--- SysTime() gives high-res time, used only for fractional seconds
--- This avoids drift between SysTime() and wall clock over long uptimes
+-- Capture SysTime and os.time at module load to compute accurate Unix time
+-- without drifting into the future: epoch = _epochAtLoad + (SysTime() - _sysTimeStart)
+local _sysTimeStart = SysTime()
+local _epochAtLoad = os_time()
 
 -- Health counters exposed to sv_server for metric emission
 GTelemetry.OTLP.CollectionErrors = 0
@@ -36,7 +37,7 @@ GTelemetry.OTLP._cycleTimeNano = nil
 -- Exponential backoff for HTTP retries
 local _backoffAttempts = 0
 local _nextSendTime = 0
-local _maxBackoff = 120
+local _maxBackoff = 30
 local _cachedGamemode = nil
 
 -- Reset gamemode cache when the gamemode changes
@@ -49,14 +50,13 @@ local _isCollecting = false
 
 --- Returns the current time in nanoseconds since Unix epoch as a string.
 -- OTLP requires timestamps as nanosecond strings.
--- Uses os.time() for whole seconds (no drift) and SysTime() only for
--- the fractional sub-second part, preventing long-term timestamp drift.
+-- Uses _epochAtLoad captured at module load to avoid drifting into the future.
+-- SysTime() only provides the fractional sub-second offset.
 -- @return string nanosecond timestamp
 function GTelemetry.OTLP.GetTimeNano()
-    local sysNow = SysTime()
-    local sysFrac = sysNow % 1
-    local epochSeconds = os_time()
-    return string_format("%.0f", (epochSeconds + sysFrac) * 1e9)
+    local now = SysTime()
+    local epochSeconds = _epochAtLoad + (now - _sysTimeStart)
+    return string_format("%.0f", epochSeconds * 1e9)
 end
 
 --- Create an OTLP attribute object.
@@ -71,7 +71,7 @@ function GTelemetry.OTLP.Attribute(key, value)
         -- Check if finite, then if integer or float
         if value < math.huge and value > -math.huge then
             if value == math_floor(value) then
-                otlpValue = {intValue = tostring(value)}
+                otlpValue = {intValue = string_format("%.0f", value)}
             else
                 otlpValue = {doubleValue = value}
             end
@@ -100,7 +100,7 @@ function GTelemetry.OTLP.MakeDataPoint(value, attributes)
     -- Set value type (NaN/Inf fall back to int = 0 for JSON safety)
     if value < math.huge and value > -math.huge then
         if value == math_floor(value) and value < 1e15 and value > -1e15 then
-            dp.asInt = tostring(value)
+            dp.asInt = string_format("%.0f", value)
         else
             dp.asDouble = value
         end
@@ -172,18 +172,19 @@ function GTelemetry.OTLP.BuildPayload(metrics)
     local currentMap = game.GetMap() or "unknown"
     local serviceName = GTelemetry.Config.GetServiceName()
 
+    if not _cachedGamemode then
+        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
+    end
+
     local payload = {
         resourceMetrics = {
             {
                 resource = {
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
-                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.1.0"),
+                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.5"),
                         GTelemetry.OTLP.Attribute("host.name", hostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
-                        if not _cachedGamemode then
-                            _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
-                        end
                         GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
                     },
                 },
@@ -191,7 +192,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                     {
                         scope = {
                             name = "gTelemetry",
-                            version = GTelemetry.Version or "1.1.0",
+                            version = GTelemetry.Version or "1.5.5",
                         },
                         metrics = metrics,
                     },
@@ -271,6 +272,8 @@ function GTelemetry.OTLP.CollectAndSend()
     end
     _isCollecting = true
 
+    GTelemetry.Debug("Collection cycle started")
+
     local ok, err = pcall(function()
         GTelemetry.OTLP._cycleTimeNano = GTelemetry.OTLP.GetTimeNano()
         local startWall = SysTime()
@@ -282,6 +285,8 @@ function GTelemetry.OTLP.CollectAndSend()
             if collector.Collect then
                 local ok2, result = pcall(collector.Collect)
                 if ok2 and result then
+                    local count = #result
+                    GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
                     for _, metric in ipairs(result) do
                         table_insert(allMetrics, metric)
                     end
@@ -289,12 +294,15 @@ function GTelemetry.OTLP.CollectAndSend()
                 elseif not ok2 then
                     GTelemetry.OTLP.CollectionErrors = GTelemetry.OTLP.CollectionErrors + 1
                     GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(result))
+                else
+                    GTelemetry.Debug("Collector '" .. name .. "' returned nil (skipped)")
                 end
             end
         end
 
         if #allMetrics == 0 then
             GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            GTelemetry.Debug("Total collectors: " .. table.Count(GTelemetry.Collectors))
             return
         end
 

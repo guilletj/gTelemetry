@@ -1,16 +1,10 @@
 // Example Grafana Alloy configuration for gTelemetry
 // Save this as config.alloy and run: alloy run config.alloy
-//
-// This configuration:
-// 1. Receives OTLP metrics from gTelemetry via HTTP on port 4318
-// 2. Batches metrics for efficiency
-// 3. Exports to Prometheus (via remote_write) and/or InfluxDB
-//
-// Uncomment the exporter sections you need.
 
-// ============================================================
-// OTLP Receiver — accepts metrics from gTelemetry
-// ============================================================
+// ════════════════════════════════════════════════════════════
+// OTLP Receiver — accepts metrics (and optionally logs)
+// from gTelemetry via HTTP on port 4318
+// ════════════════════════════════════════════════════════════
 otelcol.receiver.otlp "gmod" {
     http {
         endpoint = "0.0.0.0:4318"
@@ -18,32 +12,22 @@ otelcol.receiver.otlp "gmod" {
 
     output {
         metrics = [otelcol.processor.batch.default.input]
-        // Uncomment for Loki log support (see Loki section below):
+        // Uncomment for Loki log support (see Optional: Loki section below):
         // logs    = [otelcol.processor.batch.logs.input]
     }
 }
 
-// ============================================================
-// Batch Processor — groups metrics before export
-// ============================================================
+// ════════════════════════════════════════════════════════════
+// Metrics pipeline — Prometheus remote_write
+// ════════════════════════════════════════════════════════════
 otelcol.processor.batch "default" {
     timeout = "5s"
     send_batch_size = 1000
 
     output {
-        metrics = [
-            // Uncomment the exporters you want to use:
-            otelcol.exporter.prometheus.default.input,
-            // otelcol.exporter.otlphttp.influxdb.input,
-        ]
+        metrics = [otelcol.exporter.prometheus.default.input]
     }
 }
-
-// ============================================================
-// OPTION A: Export to Prometheus
-// ============================================================
-// This exposes a /metrics endpoint that Prometheus can scrape,
-// or you can use remote_write to push to Prometheus/Mimir.
 
 otelcol.exporter.prometheus "default" {
     forward_to = [prometheus.remote_write.default.receiver]
@@ -57,11 +41,13 @@ prometheus.remote_write "default" {
     }
 }
 
+// ════════════════════════════════════════════════════════════
+// Optional: Export to InfluxDB (via OTLP HTTP)
+// Uncomment to use InfluxDB instead of or alongside Prometheus.
 // ============================================================
-// OPTION B: Export to InfluxDB (via OTLP HTTP)
+// To use both Prometheus AND InfluxDB, add the InfluxDB exporter
+// to the batch processor's output.metrics array above.
 // ============================================================
-// Uncomment this section if you want to use InfluxDB instead.
-// InfluxDB 2.x+ supports OTLP natively.
 
 // otelcol.exporter.otlphttp "influxdb" {
 //     client {

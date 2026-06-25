@@ -29,6 +29,14 @@ function GTelemetry.Collectors.DarkRP.Init()
     Attribute = GTelemetry.OTLP.Attribute
 end
 
+function GTelemetry.Collectors.DarkRP.Undo()
+    if not _initialized then return end
+    _initialized = false
+    MakeGauge = nil
+    MakeDataPoint = nil
+    Attribute = nil
+end
+
 --- Check if DarkRP is available.
 -- @return boolean
 function GTelemetry.Collectors.DarkRP.IsAvailable()
@@ -57,45 +65,45 @@ function GTelemetry.Collectors.DarkRP.Collect()
     local propsPerPlayer = {}
 
     for _, ply in ipairs(players) do
-        if not IsValid(ply) or ply:IsBot() then continue end
+        if IsValid(ply) and not ply:IsBot() then
+            humanCount = humanCount + 1
 
-        humanCount = humanCount + 1
+            -- Money
+            local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
+            totalMoney = totalMoney + (money or 0)
+            if money and money > 0 then
+                moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
+                    Attribute("player.name", ply:Nick()),
+                    Attribute("player.steam_id", ply:SteamID()),
+                })
+            end
 
-        -- Money
-        local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
-        totalMoney = totalMoney + (money or 0)
-        if money and money > 0 then
-            moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
-                Attribute("player.name", ply:Nick()),
-                Attribute("player.steam_id", ply:SteamID()),
-            })
-        end
+            -- Job
+            local jobTable = ply.getJobTable and ply:getJobTable()
+            if jobTable and jobTable.name then
+                local jobName = jobTable.name
+                jobCounts[jobName] = (jobCounts[jobName] or 0) + 1
+            end
 
-        -- Job
-        local jobTable = ply.getJobTable and ply:getJobTable()
-        if jobTable and jobTable.name then
-            local jobName = jobTable.name
-            jobCounts[jobName] = (jobCounts[jobName] or 0) + 1
-        end
+            -- Wanted status
+            if ply.getDarkRPVar and ply:getDarkRPVar("wanted") then
+                wantedCount = wantedCount + 1
+            end
 
-        -- Wanted status
-        if ply.getDarkRPVar and ply:getDarkRPVar("wanted") then
-            wantedCount = wantedCount + 1
-        end
+            -- Arrested status
+            if ply.isArrested and ply:isArrested() then
+                arrestedCount = arrestedCount + 1
+            end
 
-        -- Arrested status
-        if ply.isArrested and ply:isArrested() then
-            arrestedCount = arrestedCount + 1
-        end
-
-        -- Props count (using Cleanup system)
-        if ply.GetCount then
-            local propCount = ply:GetCount("props") or 0
-            if propCount > 0 then
-                propsPerPlayer[#propsPerPlayer + 1] = {
-                    player = ply,
-                    count = propCount,
-                }
+            -- Props count (using Cleanup system)
+            if ply.GetCount then
+                local propCount = ply:GetCount("props") or 0
+                if propCount > 0 then
+                    propsPerPlayer[#propsPerPlayer + 1] = {
+                        player = ply,
+                        count = propCount,
+                    }
+                end
             end
         end
     end
