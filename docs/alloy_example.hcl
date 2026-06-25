@@ -30,6 +30,11 @@ otelcol.processor.batch "default" {
 }
 
 otelcol.exporter.prometheus "default" {
+    // Propagate OTLP metric descriptions as Prometheus HELP strings.
+    // Requires a backend that supports metadata in remote write (Mimir, Prometheus 3.x+).
+    // Without this, descriptions are dropped — visible in Grafana's metric browser only when set.
+    honor_metadata = true
+
     forward_to = [prometheus.remote_write.default.receiver]
 }
 
