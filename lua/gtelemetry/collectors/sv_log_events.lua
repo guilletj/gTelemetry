@@ -434,6 +434,8 @@ function GTelemetry.Collectors.LogEvents.Undo()
     hook.Remove("gamemode.PostGamemodeLoaded", "GTelemetry_LogGamemode")
     hook.Remove("ShutDown", "GTelemetry_LogShutdown")
 
+    _prevMap = nil
+    _serverStarted = false
     GTelemetry.OTLP.Logs.ClearBuffer()
     GTelemetry.Debug("LogEvents collector stopped")
 end

@@ -82,19 +82,19 @@ function GTelemetry.Collectors.BLogs.Undo()
 end
 
 local _hookSpecs = {
-    {event = "PlayerSay", id = "gtelemetry_chat", fn = function(ply, text, teamOnly)
+    {event = "PlayerSay", id = "GTelemetry_BLogs_chat", fn = function(ply, text, teamOnly)
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", (teamOnly and "[TEAM] " or "") .. "[" .. ply:Nick() .. "] " .. text, {Attribute("log.source", "chat")})
     end},
-    {event = "PlayerInitialSpawn", id = "gtelemetry_join", fn = function(ply)
+    {event = "PlayerInitialSpawn", id = "GTelemetry_BLogs_join", fn = function(ply)
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " (" .. ply:SteamID() .. ") connected", {Attribute("log.source", "player"), Attribute("log.event", "connect")})
     end},
-    {event = "PlayerDisconnected", id = "gtelemetry_leave", fn = function(ply)
+    {event = "PlayerDisconnected", id = "GTelemetry_BLogs_leave", fn = function(ply)
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " (" .. ply:SteamID() .. ") disconnected", {Attribute("log.source", "player"), Attribute("log.event", "disconnect")})
     end},
-    {event = "PlayerHurt", id = "gtelemetry_hurt", fn = function(victim, attacker, health, damage)
+    {event = "PlayerHurt", id = "GTelemetry_BLogs_hurt", fn = function(victim, attacker, health, damage)
         if not IsValid(victim) then return end
         local vicName = victim:Nick()
         local body
@@ -107,7 +107,7 @@ local _hookSpecs = {
         end
         AddLog(SEVERITY_INFO, "INFO", body, {Attribute("log.source", "combat"), Attribute("log.event", "hurt")})
     end},
-    {event = "PlayerDeath", id = "gtelemetry_death", fn = function(victim, inflictor, attacker)
+    {event = "PlayerDeath", id = "GTelemetry_BLogs_death", fn = function(victim, inflictor, attacker)
         if not IsValid(victim) then return end
         local vicName = victim:Nick()
         local body
@@ -123,95 +123,95 @@ local _hookSpecs = {
         end
         AddLog(SEVERITY_INFO, "INFO", body, {Attribute("log.source", "player"), Attribute("log.event", "death")})
     end},
-    {event = "PlayerChangedTeam", id = "gtelemetry_team", fn = function(ply, oldTeam, newTeam)
+    {event = "PlayerChangedTeam", id = "GTelemetry_BLogs_team", fn = function(ply, oldTeam, newTeam)
         if not IsValid(ply) then return end
         local oldName = team.GetName and team.GetName(oldTeam) or tostring(oldTeam)
         local newName = team.GetName and team.GetName(newTeam) or tostring(newTeam)
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " joined " .. newName .. " (from " .. oldName .. ")", {Attribute("log.source", "player"), Attribute("log.event", "team_change")})
     end},
-    {event = "PlayerEnteredVehicle", id = "gtelemetry_vehicle_enter", fn = function(ply, vehicle, role)
+    {event = "PlayerEnteredVehicle", id = "GTelemetry_BLogs_vehicle_enter", fn = function(ply, vehicle, role)
         if not IsValid(ply) or not IsValid(vehicle) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " entered " .. vehicle:GetClass(), {Attribute("log.source", "vehicle"), Attribute("log.event", "enter")})
     end},
-    {event = "PlayerExitedVehicle", id = "gtelemetry_vehicle_exit", fn = function(ply, vehicle)
+    {event = "PlayerExitedVehicle", id = "GTelemetry_BLogs_vehicle_exit", fn = function(ply, vehicle)
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " exited " .. (IsValid(vehicle) and vehicle:GetClass() or "unknown"), {Attribute("log.source", "vehicle"), Attribute("log.event", "exit")})
     end},
-    {event = "OnLuaError", id = "gtelemetry_error", fn = function(error, realm, stack, name)
+    {event = "OnLuaError", id = "GTelemetry_BLogs_error", fn = function(error, realm, stack, name)
         local source = name and "[" .. name .. "]" or ""
         local body = source .. " " .. tostring(error)
         if stack then body = body .. "\n" .. tostring(stack) end
         AddLog(SEVERITY_ERROR, "ERROR", body, {Attribute("log.source", "error"), Attribute("log.realm", realm or "SERVER")})
     end},
-    {event = "ULibCommandCalled", id = "gtelemetry_ulx", fn = function(ply, cmd, args)
+    {event = "ULibCommandCalled", id = "GTelemetry_BLogs_ulx", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. (args and safeConcat(args) or ""), {Attribute("log.source", "admin"), Attribute("admin.mod", "ulx")})
     end},
-    {event = "SAM.RanCommand", id = "gtelemetry_sam", fn = function(ply, cmd_name, args)
+    {event = "SAM.RanCommand", id = "GTelemetry_BLogs_sam", fn = function(ply, cmd_name, args)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},
-    {event = "SAM.PlayerCommand", id = "gtelemetry_sam_legacy", fn = function(ply, cmd, args)
+    {event = "SAM.PlayerCommand", id = "GTelemetry_BLogs_sam_legacy", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},
-    {event = "FAdmin_CommandCalled", id = "gtelemetry_fadmin", fn = function(ply, cmd, args)
+    {event = "FAdmin_CommandCalled", id = "GTelemetry_BLogs_fadmin", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
     end},
-    {event = "FAdmin.Server.PlayerCommand", id = "gtelemetry_fadmin_server", fn = function(ply, cmd, args)
+    {event = "FAdmin.Server.PlayerCommand", id = "GTelemetry_BLogs_fadmin_server", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
     end},
-    {event = "FAdmin_OnCommandExecuted", id = "gtelemetry_fadmin_exec", fn = function(ply, cmd, args, results)
+    {event = "FAdmin_OnCommandExecuted", id = "GTelemetry_BLogs_fadmin_exec", fn = function(ply, cmd, args, results)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
     end},
-    {event = "xAdminCanRunCommand", id = "gtelemetry_xadmin", fn = function(ply, cmd, args, fromConsole)
+    {event = "xAdminCanRunCommand", id = "GTelemetry_BLogs_xadmin", fn = function(ply, cmd, args, fromConsole)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
     end},
-    {event = "xAdminCommandRun", id = "gtelemetry_xadmin_paid", fn = function(ply, target, cmd, args)
+    {event = "xAdminCommandRun", id = "GTelemetry_BLogs_xadmin_paid", fn = function(ply, target, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
     end},
-    {event = "PlayerSpawnedProp", id = "gtelemetry_spawn_prop", fn = function(ply, model, ent)
+    {event = "PlayerSpawnedProp", id = "GTelemetry_BLogs_spawn_prop", fn = function(ply, model, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Prop] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "prop")})
     end},
-    {event = "PlayerSpawnedVehicle", id = "gtelemetry_spawn_vehicle", fn = function(ply, ent)
+    {event = "PlayerSpawnedVehicle", id = "GTelemetry_BLogs_spawn_vehicle", fn = function(ply, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Vehicle] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "vehicle")})
     end},
-    {event = "PlayerSpawnedNPC", id = "gtelemetry_spawn_npc", fn = function(ply, ent)
+    {event = "PlayerSpawnedNPC", id = "GTelemetry_BLogs_spawn_npc", fn = function(ply, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[NPC] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "npc")})
     end},
-    {event = "PlayerSpawnedSENT", id = "gtelemetry_spawn_sent", fn = function(ply, ent)
+    {event = "PlayerSpawnedSENT", id = "GTelemetry_BLogs_spawn_sent", fn = function(ply, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[SENT] " .. ply:Nick() .. " spawned " .. (IsValid(ent) and ent:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "sent")})
     end},
-    {event = "PlayerSpawnedSWEP", id = "gtelemetry_spawn_swep", fn = function(ply, swep)
+    {event = "PlayerSpawnedSWEP", id = "GTelemetry_BLogs_spawn_swep", fn = function(ply, swep)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[SWEP] " .. ply:Nick() .. " spawned " .. (IsValid(swep) and swep:GetClass() or "unknown"), {Attribute("log.source", "spawn"), Attribute("spawn.type", "swep")})
     end},
-    {event = "PlayerSpawnedRagdoll", id = "gtelemetry_spawn_ragdoll", fn = function(ply, model, ent)
+    {event = "PlayerSpawnedRagdoll", id = "GTelemetry_BLogs_spawn_ragdoll", fn = function(ply, model, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Ragdoll] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "ragdoll")})
     end},
-    {event = "PlayerSpawnedEffect", id = "gtelemetry_spawn_effect", fn = function(ply, model, ent)
+    {event = "PlayerSpawnedEffect", id = "GTelemetry_BLogs_spawn_effect", fn = function(ply, model, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", "[Effect] " .. ply:Nick() .. " spawned " .. tostring(model), {Attribute("log.source", "spawn"), Attribute("spawn.type", "effect")})
     end},
-    {event = "PlayerPickupItem", id = "gtelemetry_pickup", fn = function(ply, item)
+    {event = "PlayerPickupItem", id = "GTelemetry_BLogs_pickup", fn = function(ply, item)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " picked up " .. (IsValid(item) and item:GetClass() or "unknown"), {Attribute("log.source", "item"), Attribute("log.event", "pickup")})
     end},
-    {event = "PlayerDroppedWeapon", id = "gtelemetry_drop", fn = function(ply, weapon)
+    {event = "PlayerDroppedWeapon", id = "GTelemetry_BLogs_drop", fn = function(ply, weapon)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " dropped " .. (IsValid(weapon) and weapon:GetClass() or "unknown"), {Attribute("log.source", "item"), Attribute("log.event", "drop")})
     end},
-    {event = "InitPostEntity", id = "gtelemetry_map", fn = function()
+    {event = "InitPostEntity", id = "GTelemetry_BLogs_map", fn = function()
         local currentMap = game.GetMap() or "unknown"
         if not _modulePrevMap then
             _modulePrevMap = currentMap
@@ -223,7 +223,7 @@ local _hookSpecs = {
             _modulePrevMap = currentMap
         end
     end},
-    {event = "gamemode.PostGamemodeLoaded", id = "gtelemetry_gamemode", fn = function()
+    {event = "gamemode.PostGamemodeLoaded", id = "GTelemetry_BLogs_gamemode", fn = function()
         AddLog(SEVERITY_INFO, "INFO", "Gamemode loaded: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown"), {Attribute("log.source", "system"), Attribute("log.event", "gamemode_change")})
     end},
 }
@@ -330,7 +330,7 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
         return
     end
 
-    _wrappedModules = {}
+    _wrappedModules = _wrappedModules or {}
 
     _origAddModule = GAS.Logging.AddModule
     GAS.Logging.AddModule = function(self, mod)

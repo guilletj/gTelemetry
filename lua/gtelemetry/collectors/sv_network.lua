@@ -25,7 +25,9 @@ local _initialized = false
 -- Reset detail tables when they exceed this many entries to prevent unbounded growth.
 -- Cumulative counters (_netMessagesSent/_netMessagesReceived) remain accurate.
 local _maxDetailEntries = 1000
-local _originalNetStart = nil
+-- Capture GMod built-ins at module load to avoid stale references on re-init
+local _realNetStart = net.Start
+local _realNetReceive = net.Receive
 local _originalNetReceive = nil
 
 local pairs = pairs
@@ -38,14 +40,7 @@ local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
 function GTelemetry.Collectors.Network.Init()
-    if _initialized then
-        _netMessagesSent = 0
-        _netMessagesReceived = 0
-        _netMessagesSentByName = {}
-        _netMessagesReceivedByName = {}
-        _startTimeNano = GTelemetry.OTLP.GetTimeNano()
-        return
-    end
+    if _initialized then return end
     _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
@@ -61,7 +56,7 @@ function GTelemetry.Collectors.Network.Init()
     -- This is a best-effort measurement, not byte-exact accounting.
 
     -- Wrap net.Start to count outgoing messages
-    _originalNetStart = net.Start
+    _originalNetStart = _realNetStart
     net.Start = function(messageName, unreliable)
         _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)
@@ -69,15 +64,14 @@ function GTelemetry.Collectors.Network.Init()
             _netDetailCount = _netDetailCount + 1
         end
         _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
-        return _originalNetStart(messageName, unreliable)
+        return _realNetStart(messageName, unreliable)
     end
 
     -- Track incoming messages via a hook on net.Receive registrations
     -- We increment a counter each time any net message is received
-    _originalNetReceive = net.Receive
     net.Receive = function(messageName, callback)
         local msgStr = tostring(messageName)
-        return _originalNetReceive(messageName, function(len, ply)
+        return _realNetReceive(messageName, function(len, ply)
             _netMessagesReceived = _netMessagesReceived + 1
             if not _netMessagesReceivedByName[msgStr] then
                 _netDetailCount = _netDetailCount + 1
@@ -92,16 +86,14 @@ end
 
 --- Restore original net.Start/net.Receive and reset counters.
 function GTelemetry.Collectors.Network.Undo()
-    if _originalNetStart then net.Start = _originalNetStart end
-    if _originalNetReceive then net.Receive = _originalNetReceive end
+    net.Start = _realNetStart
+    net.Receive = _realNetReceive
     _netMessagesSent = 0
     _netMessagesReceived = 0
     _netMessagesSentByName = {}
     _netMessagesReceivedByName = {}
     _startTimeNano = nil
     _initialized = false
-    _originalNetStart = nil
-    _originalNetReceive = nil
     _netDetailCount = 0
     MakeGauge = nil
     MakeDataPoint = nil

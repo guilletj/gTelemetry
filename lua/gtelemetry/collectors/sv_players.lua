@@ -33,14 +33,6 @@ util.AddNetworkString("GTelemetry_ClientData")
 util.AddNetworkString("GTelemetry_ClientReady")
 util.AddNetworkString("GTelemetry_RequestReady")
 
--- Clean up player data on disconnect (always active — net.Receive handlers
--- are also permanent, so this prevents _playerData from leaking entries
--- when telemetry is toggled off and on).
-hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
-    if not IsValid(ply) then return end
-    _playerData[ply:SteamID()] = nil
-end)
-
 net.Receive("GTelemetry_ClientData", function(len, ply)
     if not IsValid(ply) then return end
     if ply:IsBot() then return end
@@ -97,6 +89,12 @@ function GTelemetry.Collectors.Players.Init()
         end
     end)
 
+    -- Clean up player data on disconnect
+    hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
+        if not IsValid(ply) then return end
+        _playerData[ply:SteamID()] = nil
+    end)
+
     -- Track player connections (skip bots — they don't send client data)
     hook.Add("PlayerInitialSpawn", "GTelemetry_PlayerConnect", function(ply)
         if ply:IsBot() then return end
@@ -120,6 +118,7 @@ function GTelemetry.Collectors.Players.Undo()
 
     hook.Remove("PlayerDeath", "GTelemetry_PlayerDeath")
     hook.Remove("PlayerInitialSpawn", "GTelemetry_PlayerConnect")
+    hook.Remove("PlayerDisconnected", "GTelemetry_PlayerDisconnect")
 
     _playerData = {}
     _startTimeNano = nil
@@ -190,13 +189,15 @@ function GTelemetry.Collectors.Players.Collect(players)
 
                     -- Load time (reported once, after first spawn)
                     -- -1 sentinel means client never sent ready signal within timeout
-                    if data.loadTime then
+                    if data.loadTime ~= nil then
                         if data.loadTime ~= 0 then
                             loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
                         end
                     elseif curTime - data.connectTime > _clientLoadTimeout then
-                        data.loadTime = -1
-                        GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
+                        if data.loadTime ~= -1 then
+                            data.loadTime = -1
+                            GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
+                        end
                     end
                 end
             end

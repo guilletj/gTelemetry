@@ -341,6 +341,13 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_Collect") then
             timer.Remove("GTelemetry_Collect")
         end
+        if timer.Exists("GTelemetry_LogFlush") then
+            timer.Remove("GTelemetry_LogFlush")
+        end
+        -- Flush buffered logs before clearing
+        if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+            GTelemetry.OTLP.Logs.Flush()
+        end
         for _, collector in pairs(GTelemetry.Collectors) do
             if collector.Undo then
                 pcall(collector.Undo)
@@ -394,7 +401,11 @@ end, "gtelemetry_log_endpoint_change")
 
 -- Listen for bLogs mode changes
 cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
-    GTelemetry.Log("bLogs integration mode changed to: " .. newVal .. " — toggle gtelemetry_log_enabled to apply")
+    local valid = {off = true, replace = true, intercept = true, hybrid = true}
+    if not valid[newVal] then
+        GTelemetry.Warn("Invalid gtelemetry_log_blogs_mode value: " .. tostring(newVal) .. ". Valid: off, replace, intercept, hybrid")
+    end
+    GTelemetry.Log("bLogs integration mode changed to: " .. tostring(newVal) .. " — toggle gtelemetry_log_enabled to apply")
 end, "gtelemetry_log_blogs_mode_change")
 
 

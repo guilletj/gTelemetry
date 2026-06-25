@@ -78,6 +78,10 @@ end
 
 --- Start (or restart) the metric collection timer.
 function GTelemetry.StartCollection()
+    if GTelemetry.OTLP and GTelemetry.OTLP.ResetBackoff then
+        GTelemetry.OTLP.ResetBackoff()
+    end
+
     local interval = GTelemetry.Config.GetInterval()
 
     timer.Create("GTelemetry_Collect", interval, 0, function()
@@ -156,11 +160,6 @@ if game.GetMap() and game.GetMap() ~= "" then
 
             if GTelemetry.Config.IsLogEnabled() and not timer.Exists("GTelemetry_LogFlush") then
                 GTelemetry.StartLogCollection()
-            end
-
-            -- Count current map since InitPostEntity already fired before module load
-            if GTelemetry.Collectors.Map and GTelemetry.Collectors.Map.CountChange then
-                GTelemetry.Collectors.Map.CountChange()
             end
 
             -- Re-request client-ready signals from already-connected players
