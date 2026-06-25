@@ -64,7 +64,9 @@ local _isCollecting = false
 function GTelemetry.OTLP.GetTimeNano()
     local now = SysTime()
     local epochSeconds = _epochAtLoad + (now - _sysTimeStart)
-    return string_format("%.0f", epochSeconds * 1e9)
+    local intPart = math_floor(epochSeconds)
+    local nanoPart = math_floor((epochSeconds - intPart) * 1e9)
+    return string_format("%d%09d", intPart, nanoPart)
 end
 
 --- Create an OTLP attribute object.

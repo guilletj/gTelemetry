@@ -116,8 +116,9 @@ function GTelemetry.StartLogCollection()
     GTelemetry.Log("Log collection started (interval: " .. interval .. "s, endpoint: " .. GTelemetry.Config.GetLogEndpoint() .. ")")
 end
 
--- Initialize on server start
+-- Initialize on server start (one-shot: removes itself on first fire)
 hook.Add("InitPostEntity", "GTelemetry_Init", function()
+    hook.Remove("InitPostEntity", "GTelemetry_Init")
     if not GTelemetry.Config.IsEnabled() then
         GTelemetry.Log("Telemetry is disabled. Set gtelemetry_enabled 1 to enable.")
         return

@@ -174,8 +174,20 @@ function GTelemetry.OTLP.Logs.Flush()
     end
 
     if not success or not result then
-        _logBuffer = records
-        _bufferSize = #records
+        local failedCount = #records
+        if failedCount > 0 then
+            local currentStart = _bufferStart
+            local currentSize = _bufferSize
+            for i = currentSize, 1, -1 do
+                _logBuffer[currentStart + failedCount + i - 1] = _logBuffer[currentStart + i - 1]
+                _logBuffer[currentStart + i - 1] = nil
+            end
+            for i = 1, failedCount do
+                _logBuffer[currentStart + i - 1] = records[i]
+            end
+            _bufferStart = currentStart
+            _bufferSize = currentSize + failedCount
+        end
     end
     _isFlushing = false
 end

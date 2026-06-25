@@ -42,6 +42,8 @@ function GTelemetry.Collectors.Server.Undo()
     MakeSum = nil
     MakeCumulativeDataPoint = nil
     _startTimeNano = nil
+    GTelemetry.OTLP.CollectionErrors = 0
+    GTelemetry.OTLP.SendFailures = 0
 end
 
 --- Collect server performance metrics.

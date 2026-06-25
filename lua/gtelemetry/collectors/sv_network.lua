@@ -28,7 +28,6 @@ local _maxDetailEntries = 1000
 -- Capture GMod built-ins at module load to avoid stale references on re-init
 local _realNetStart = net.Start
 local _realNetReceive = net.Receive
-local _originalNetReceive = nil
 
 local pairs = pairs
 local ipairs = ipairs
@@ -56,7 +55,6 @@ function GTelemetry.Collectors.Network.Init()
     -- This is a best-effort measurement, not byte-exact accounting.
 
     -- Wrap net.Start to count outgoing messages
-    _originalNetStart = _realNetStart
     net.Start = function(messageName, unreliable)
         _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)

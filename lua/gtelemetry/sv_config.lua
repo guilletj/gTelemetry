@@ -334,7 +334,9 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         end
         -- Re-init log hooks if they were stopped by toggling off
         if GTelemetry.Config.IsLogEnabled() and GTelemetry.StartLogCollection then
-            GTelemetry.StartLogCollection()
+            if not timer.Exists("GTelemetry_LogFlush") then
+                GTelemetry.StartLogCollection()
+            end
         end
     else
         GTelemetry.Log("Telemetry disabled")
@@ -370,6 +372,9 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
         end
     else
         GTelemetry.Log("Log collection disabled")
+        if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+            GTelemetry.OTLP.Logs.Flush()
+        end
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
         end
@@ -394,7 +399,8 @@ cvars.AddChangeCallback("gtelemetry_endpoint", function()
 end, "gtelemetry_endpoint_change")
 
 cvars.AddChangeCallback("gtelemetry_log_endpoint", function()
-    if GTelemetry.OTLP and GTelemetry.OTLP.Logs and GTelemetry.OTLP.Logs.ResetBackoff then
+    if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+        GTelemetry.OTLP.Logs.Flush()
         GTelemetry.OTLP.Logs.ResetBackoff()
     end
 end, "gtelemetry_log_endpoint_change")
