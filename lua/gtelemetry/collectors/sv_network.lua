@@ -104,8 +104,9 @@ function GTelemetry.Collectors.Network.Undo()
 end
 
 --- Collect network metrics.
+-- @param players table|nil pre-cached player list from CollectAndSend
 -- @return table list of OTLP metric objects
-function GTelemetry.Collectors.Network.Collect()
+function GTelemetry.Collectors.Network.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Network.Init() end
 
     local metrics = {}
@@ -190,7 +191,7 @@ function GTelemetry.Collectors.Network.Collect()
     end
 
     -- Packet loss: single pass for both average and per-player
-    local players = player.GetAll()
+    players = players or player.GetAll()
     local totalLoss = 0
     local humanCount = 0
     local lossPoints = {}

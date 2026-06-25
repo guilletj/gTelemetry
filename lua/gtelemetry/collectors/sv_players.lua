@@ -132,12 +132,13 @@ function GTelemetry.Collectors.Players.Undo()
 end
 
 --- Collect player metrics.
+-- @param players table|nil pre-cached player list from CollectAndSend
 -- @return table list of OTLP metric objects
-function GTelemetry.Collectors.Players.Collect()
+function GTelemetry.Collectors.Players.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Players.Init() end
 
     local metrics = {}
-    local players = player.GetAll()
+    players = players or player.GetAll()
     local playerCount = player.GetCount()
     local botCount = 0
     local totalPing = 0

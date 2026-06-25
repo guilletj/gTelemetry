@@ -44,8 +44,9 @@ function GTelemetry.Collectors.DarkRP.IsAvailable()
 end
 
 --- Collect DarkRP economic metrics.
+-- @param players table|nil pre-cached player list from CollectAndSend
 -- @return table list of OTLP metric objects
-function GTelemetry.Collectors.DarkRP.Collect()
+function GTelemetry.Collectors.DarkRP.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.DarkRP.Init() end
 
     -- Skip if DarkRP is not available or disabled
@@ -54,7 +55,7 @@ function GTelemetry.Collectors.DarkRP.Collect()
     if not GTelemetry.Config.IsDarkRPEnabled() then return nil end
 
     local metrics = {}
-    local players = player.GetAll()
+    players = players or player.GetAll()
 
     local totalMoney = 0
     local humanCount = 0

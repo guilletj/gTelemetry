@@ -301,10 +301,11 @@ function GTelemetry.OTLP.CollectAndSend()
 
         local allMetrics = {}
         local collectorCount = 0
+        local players = player.GetAll()
 
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
-                local ok2, result = pcall(collector.Collect)
+                local ok2, result = pcall(collector.Collect, players)
                 if ok2 and type(result) == "table" then
                     local count = #result
                     GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")

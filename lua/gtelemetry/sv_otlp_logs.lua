@@ -167,15 +167,11 @@ function GTelemetry.OTLP.Logs.Flush()
 
     if not success then
         GTelemetry.Warn("Log flush failed: " .. tostring(result))
-        local newRecords = _logBuffer
-        _logBuffer = records
-        for _, v in ipairs(newRecords) do
-            table_insert(_logBuffer, v)
-        end
-        _bufferSize = #_logBuffer
     elseif not result then
-        -- Send() returned false (backoff skip) — re-insert records to avoid data loss
         GTelemetry.Debug("Log flush skipped (backoff active), re-inserting " .. #records .. " records")
+    end
+
+    if not success or not result then
         local newRecords = _logBuffer
         _logBuffer = records
         for _, v in ipairs(newRecords) do
@@ -188,9 +184,6 @@ end
 
 --- Clear buffer without sending.
 function GTelemetry.OTLP.Logs.ClearBuffer()
-    for i = 0, _bufferSize - 1 do
-        _logBuffer[_bufferStart + i] = nil
-    end
     _logBuffer = {}
     _bufferStart = 1
     _bufferSize = 0
