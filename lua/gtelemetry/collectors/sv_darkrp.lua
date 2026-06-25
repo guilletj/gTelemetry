@@ -44,8 +44,9 @@ function GTelemetry.Collectors.DarkRP.IsAvailable()
 end
 
 --- Collect DarkRP economic metrics.
+-- @param players table|nil pre-cached player list from CollectAndSend
 -- @return table list of OTLP metric objects
-function GTelemetry.Collectors.DarkRP.Collect()
+function GTelemetry.Collectors.DarkRP.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.DarkRP.Init() end
 
     -- Skip if DarkRP is not available or disabled
@@ -54,7 +55,7 @@ function GTelemetry.Collectors.DarkRP.Collect()
     if not GTelemetry.Config.IsDarkRPEnabled() then return nil end
 
     local metrics = {}
-    local players = player.GetAll()
+    players = players or player.GetAll()
 
     local totalMoney = 0
     local humanCount = 0
@@ -65,46 +66,51 @@ function GTelemetry.Collectors.DarkRP.Collect()
     local propsPerPlayer = {}
 
     for _, ply in ipairs(players) do
-        if IsValid(ply) and not ply:IsBot() then
-            humanCount = humanCount + 1
+        local ok2, err2 = pcall(function()
+            if IsValid(ply) and not ply:IsBot() then
+                humanCount = humanCount + 1
 
-            -- Money
-            local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
-            totalMoney = totalMoney + (money or 0)
-            if money and money > 0 then
-                moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
-                    Attribute("player.name", ply:Nick()),
-                    Attribute("player.steam_id", ply:SteamID()),
-                })
-            end
+                -- Money
+                local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
+                totalMoney = totalMoney + money
+                if money > 0 then
+                    moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
+                        Attribute("player.name", ply:Nick()),
+                        Attribute("player.steam_id", ply:SteamID()),
+                    })
+                end
 
-            -- Job
-            local jobTable = ply.getJobTable and ply:getJobTable()
-            if jobTable and jobTable.name then
-                local jobName = jobTable.name
-                jobCounts[jobName] = (jobCounts[jobName] or 0) + 1
-            end
+                -- Job
+                local jobTable = ply.getJobTable and ply:getJobTable()
+                if jobTable and jobTable.name then
+                    local jobName = jobTable.name
+                    jobCounts[jobName] = (jobCounts[jobName] or 0) + 1
+                end
 
-            -- Wanted status
-            if ply.getDarkRPVar and ply:getDarkRPVar("wanted") then
-                wantedCount = wantedCount + 1
-            end
+                -- Wanted status
+                if ply.getDarkRPVar and ply:getDarkRPVar("wanted") then
+                    wantedCount = wantedCount + 1
+                end
 
-            -- Arrested status
-            if ply.isArrested and ply:isArrested() then
-                arrestedCount = arrestedCount + 1
-            end
+                -- Arrested status
+                if ply.isArrested and ply:isArrested() then
+                    arrestedCount = arrestedCount + 1
+                end
 
-            -- Props count (using Cleanup system)
-            if ply.GetCount then
-                local propCount = ply:GetCount("props") or 0
-                if propCount > 0 then
-                    propsPerPlayer[#propsPerPlayer + 1] = {
-                        player = ply,
-                        count = propCount,
-                    }
+                -- Props count (using Cleanup system)
+                if ply.GetCount then
+                    local propCount = ply:GetCount("props")
+                    if propCount and propCount > 0 then
+                        propsPerPlayer[#propsPerPlayer + 1] = {
+                            player = ply,
+                            count = propCount,
+                        }
+                    end
                 end
             end
+        end)
+        if not ok2 then
+            GTelemetry.Debug("DarkRP player iteration failed: " .. tostring(err2))
         end
     end
 

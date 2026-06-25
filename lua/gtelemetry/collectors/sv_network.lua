@@ -18,8 +18,13 @@ local _netMessagesSent = 0
 local _netMessagesReceived = 0
 local _netMessagesSentByName = {}
 local _netMessagesReceivedByName = {}
+local _netDetailCount = 0  -- incremental counter for unique message names
 local _startTimeNano = nil
 local _initialized = false
+
+-- Reset detail tables when they exceed this many entries to prevent unbounded growth.
+-- Cumulative counters (_netMessagesSent/_netMessagesReceived) remain accurate.
+local _maxDetailEntries = 1000
 local _originalNetStart = nil
 local _originalNetReceive = nil
 
@@ -33,7 +38,14 @@ local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
 function GTelemetry.Collectors.Network.Init()
-    if _initialized then return end
+    if _initialized then
+        _netMessagesSent = 0
+        _netMessagesReceived = 0
+        _netMessagesSentByName = {}
+        _netMessagesReceivedByName = {}
+        _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+        return
+    end
     _initialized = true
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
@@ -53,6 +65,9 @@ function GTelemetry.Collectors.Network.Init()
     net.Start = function(messageName, unreliable)
         _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)
+        if not _netMessagesSentByName[msgStr] then
+            _netDetailCount = _netDetailCount + 1
+        end
         _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
         return _originalNetStart(messageName, unreliable)
     end
@@ -64,6 +79,9 @@ function GTelemetry.Collectors.Network.Init()
         local msgStr = tostring(messageName)
         return _originalNetReceive(messageName, function(len, ply)
             _netMessagesReceived = _netMessagesReceived + 1
+            if not _netMessagesReceivedByName[msgStr] then
+                _netDetailCount = _netDetailCount + 1
+            end
             _netMessagesReceivedByName[msgStr] = (_netMessagesReceivedByName[msgStr] or 0) + 1
             return callback(len, ply)
         end)
@@ -84,6 +102,7 @@ function GTelemetry.Collectors.Network.Undo()
     _initialized = false
     _originalNetStart = nil
     _originalNetReceive = nil
+    _netDetailCount = 0
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
@@ -93,8 +112,9 @@ function GTelemetry.Collectors.Network.Undo()
 end
 
 --- Collect network metrics.
+-- @param players table|nil pre-cached player list from CollectAndSend
 -- @return table list of OTLP metric objects
-function GTelemetry.Collectors.Network.Collect()
+function GTelemetry.Collectors.Network.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Network.Init() end
 
     local metrics = {}
@@ -116,6 +136,14 @@ function GTelemetry.Collectors.Network.Collect()
         {MakeCumulativeDataPoint(_netMessagesReceived, _startTimeNano)},
         true
     )
+
+    -- Reset detail name tables when they exceed _maxDetailEntries to prevent unbounded growth.
+    -- Uses incrementally-updated count to avoid O(n) scan.
+    if _netDetailCount > _maxDetailEntries then
+        _netMessagesSentByName = {}
+        _netMessagesReceivedByName = {}
+        _netDetailCount = 0
+    end
 
     -- Net messages sent per name (high cardinality — gated)
     if GTelemetry.Config.IsNetworkDetailsEnabled() then
@@ -167,14 +195,22 @@ function GTelemetry.Collectors.Network.Collect()
         )
     end
 
-    -- Average packet loss across all players
-    local players = player.GetAll()
+    -- Packet loss: single pass for both average and per-player
+    players = players or player.GetAll()
     local totalLoss = 0
     local humanCount = 0
+    local lossPoints = {}
     for _, ply in ipairs(players) do
         if IsValid(ply) and not ply:IsBot() then
-            totalLoss = totalLoss + (ply.PacketLoss and ply:PacketLoss() or 0)
+            local loss = ply.PacketLoss and ply:PacketLoss() or 0
+            totalLoss = totalLoss + loss
             humanCount = humanCount + 1
+            if loss > 0 then
+                lossPoints[#lossPoints + 1] = MakeDataPoint(loss, {
+                    Attribute("player.name", ply:Nick()),
+                    Attribute("player.steam_id", ply:SteamID()),
+                })
+            end
         end
     end
 
@@ -185,20 +221,6 @@ function GTelemetry.Collectors.Network.Collect()
             "%",
             {MakeDataPoint(math_Round(totalLoss / humanCount, 2))}
         )
-    end
-
-    -- Per-player packet loss
-    local lossPoints = {}
-    for _, ply in ipairs(players) do
-        if IsValid(ply) and not ply:IsBot() and ply.PacketLoss then
-            local loss = ply:PacketLoss()
-            if loss > 0 then
-                lossPoints[#lossPoints + 1] = MakeDataPoint(loss, {
-                    Attribute("player.name", ply:Nick()),
-                    Attribute("player.steam_id", ply:SteamID()),
-                })
-            end
-        end
     end
 
     if #lossPoints > 0 then

@@ -21,6 +21,7 @@ local table_insert = table.insert
 local pairs = pairs
 local ipairs = ipairs
 local math_floor = math.floor
+local math_ceil = math.ceil
 
 -- Capture SysTime and os.time at module load to compute accurate Unix time
 -- without drifting into the future: epoch = _epochAtLoad + (SysTime() - _sysTimeStart)
@@ -39,11 +40,18 @@ local _backoffAttempts = 0
 local _nextSendTime = 0
 local _maxBackoff = 30
 local _cachedGamemode = nil
+local _cachedHostname = nil
 
 -- Reset gamemode cache when the gamemode changes
 hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
     _cachedGamemode = nil
 end)
+
+-- Reset backoff (called when endpoint ConVar changes)
+function GTelemetry.OTLP.ResetBackoff()
+    _backoffAttempts = 0
+    _nextSendTime = 0
+end
 
 -- Guard to prevent concurrent collection cycles from stacking
 local _isCollecting = false
@@ -168,12 +176,13 @@ end
 -- @param metrics table list of OTLP metric objects from collectors
 -- @return string JSON-encoded payload
 function GTelemetry.OTLP.BuildPayload(metrics)
-    local hostname = GetHostName and GetHostName() or "unknown"
+    if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
     local currentMap = game.GetMap() or "unknown"
     local serviceName = GTelemetry.Config.GetServiceName()
 
     if not _cachedGamemode then
-        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gmod.GetGamemode() and gmod.GetGamemode().Name) or "unknown"
+        local gm = gmod.GetGamemode()
+        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gm and gm.Name) or "unknown"
     end
 
     local payload = {
@@ -182,8 +191,8 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                 resource = {
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
-                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.6"),
-                        GTelemetry.OTLP.Attribute("host.name", hostname),
+                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.7"),
+                        GTelemetry.OTLP.Attribute("host.name", _cachedHostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
                         GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
                     },
@@ -192,7 +201,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                     {
                         scope = {
                             name = "gTelemetry",
-                            version = GTelemetry.Version or "1.5.6",
+                            version = GTelemetry.Version or "1.5.7",
                         },
                         metrics = metrics,
                     },
@@ -204,6 +213,44 @@ function GTelemetry.OTLP.BuildPayload(metrics)
     return util_TableToJSON(payload)
 end
 
+--- Shared HTTP POST helper for OTLP payloads.
+-- Handles content-type headers, auth token, and the HTTP() call.
+-- @param endpoint string URL to POST to
+-- @param body string JSON body
+-- @param callbacks table { onSuccess = fn(), onFailure = fn(errMsg) }
+function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
+    local headers = {
+        ["Content-Type"] = "application/json",
+    }
+
+    local token = GTelemetry.Config.GetAuthToken()
+    if token then
+        headers["Authorization"] = "Bearer " .. token
+    end
+
+    GTelemetry.Debug("Sending to: " .. endpoint .. " (" .. #body .. " bytes)")
+
+    HTTP({
+        url = endpoint,
+        method = "POST",
+        headers = headers,
+        body = body,
+        type = "application/json",
+
+        success = function(code, respBody)
+            if code >= 200 and code < 300 then
+                callbacks.onSuccess()
+            else
+                callbacks.onFailure("HTTP " .. code .. ": " .. (respBody or "no body"))
+            end
+        end,
+
+        failed = function(err)
+            callbacks.onFailure(tostring(err))
+        end,
+    })
+end
+
 --- Send the OTLP payload to the configured endpoint.
 -- @param jsonBody string JSON-encoded ExportMetricsServiceRequest
 function GTelemetry.OTLP.Send(jsonBody)
@@ -212,51 +259,25 @@ function GTelemetry.OTLP.Send(jsonBody)
         return
     end
 
-    local headers = {
-        ["Content-Type"] = "application/json",
-    }
-
-    -- Add auth token if configured
-    local token = GTelemetry.Config.GetAuthToken()
-    if token then
-        headers["Authorization"] = "Bearer " .. token
-    end
-
     -- Exponential backoff: skip if still in cooldown window
     if SysTime() < _nextSendTime then
-        GTelemetry.Debug("Skipping send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
+        GTelemetry.Debug("Skipping send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
         return
     end
 
-    GTelemetry.Debug("Sending metrics to: " .. endpoint .. " (" .. #jsonBody .. " bytes)")
-
-    HTTP({
-        url = endpoint,
-        method = "POST",
-        headers = headers,
-        body = jsonBody,
-        type = "application/json",
-
-        success = function(code, body, respHeaders)
-            if code >= 200 and code < 300 then
-                if SysTime() >= _nextSendTime then
-                    _backoffAttempts = 0
-                    _nextSendTime = 0
-                end
-                GTelemetry.Debug("Metrics sent successfully (HTTP " .. code .. ")")
-            else
-                _backoffAttempts = _backoffAttempts + 1
-                _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
-                GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-                GTelemetry.Warn("Alloy returned HTTP " .. code .. ": " .. (body or "no body"))
+    GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
+        onSuccess = function()
+            if SysTime() >= _nextSendTime then
+                _backoffAttempts = 0
+                _nextSendTime = 0
             end
+            GTelemetry.Debug("Metrics sent successfully")
         end,
-
-        failed = function(err)
+        onFailure = function(errMsg)
             _backoffAttempts = _backoffAttempts + 1
             _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-            GTelemetry.Warn("Failed to send metrics: " .. tostring(err))
+            GTelemetry.Warn("Failed to send metrics: " .. errMsg)
             GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
         end,
     })
@@ -282,11 +303,12 @@ function GTelemetry.OTLP.CollectAndSend()
 
         local allMetrics = {}
         local collectorCount = 0
+        local players = player.GetAll()
 
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
-                local ok2, result = pcall(collector.Collect)
-                if ok2 and result then
+                local ok2, result = pcall(collector.Collect, players)
+                if ok2 and type(result) == "table" then
                     local count = #result
                     GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
                     for _, metric in ipairs(result) do
@@ -304,7 +326,6 @@ function GTelemetry.OTLP.CollectAndSend()
 
         if #allMetrics == 0 then
             GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
-            GTelemetry.Debug("Total collectors: " .. table.Count(GTelemetry.Collectors))
             return
         end
 

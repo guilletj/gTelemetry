@@ -14,7 +14,7 @@ local SEND_INTERVAL = 5 -- Send FPS every 5 seconds
 
 -- Signal server that this client's addon code is loaded (one-shot next frame)
 -- Deferred via timer.Simple so net is fully initialized.
-timer.Simple(0, function()
+local function SendClientReady()
     local ok, err = pcall(function()
         net.Start("GTelemetry_ClientReady")
         net.SendToServer()
@@ -22,7 +22,12 @@ timer.Simple(0, function()
     if not ok and GTelemetry and GTelemetry.Debug then
         GTelemetry.Debug("Failed to send client ready: " .. tostring(err))
     end
-end)
+end
+
+timer.Simple(0, SendClientReady)
+
+-- Retransmit ready signal if server requests it (e.g. after hot-reload)
+net.Receive("GTelemetry_RequestReady", function() SendClientReady() end)
 
 timer.Create("GTelemetry_ClientFPS", SEND_INTERVAL, 0, function()
     local frameTime = FrameTime()

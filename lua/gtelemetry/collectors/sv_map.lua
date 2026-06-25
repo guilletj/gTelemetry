@@ -13,21 +13,18 @@ GTelemetry.Collectors.Map = {}
 
 -- Track map changes
 local _mapChanges = 0
+local _mapChangesAtInit = 0
 local _startTimeNano = nil
 local _initialized = false
 local _mapCountedThisLoad = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
+local _cachedHostname = nil
+local _cachedIP = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
-
--- InitPostEntity fires exactly once per map change; no guard needed.
-hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
-    _mapChanges = _mapChanges + 1
-    GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
-end)
 
 --- Manually increment the map change counter.
 -- Used by the late-init path when InitPostEntity has already fired.
@@ -42,12 +39,16 @@ function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
-    _mapChanges = 0
+    _mapChangesAtInit = _mapChanges
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
+    hook.Add("InitPostEntity", "GTelemetry_MapInit", function()
+        _mapChanges = _mapChanges + 1
+        GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
+    end)
 end
 
 function GTelemetry.Collectors.Map.Undo()
@@ -55,6 +56,8 @@ function GTelemetry.Collectors.Map.Undo()
     _initialized = false
     hook.Remove("InitPostEntity", "GTelemetry_MapInit")
     _startTimeNano = nil
+    _mapChangesAtInit = 0
+    _mapCountedThisLoad = false
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
@@ -70,9 +73,10 @@ function GTelemetry.Collectors.Map.Collect()
     local metrics = {}
 
     local currentMap = game.GetMap() or "unknown"
-    local gamemodeName = gmod.GetGamemode() and gmod.GetGamemode().Name or "unknown"
-    local hostname = GetHostName and GetHostName() or "unknown"
-    local serverIP = game.GetIPAddress and game.GetIPAddress() or "unknown"
+    local gm = gmod.GetGamemode()
+    local gamemodeName = gm and gm.Name or "unknown"
+    if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
+    if not _cachedIP then _cachedIP = game.GetIPAddress and game.GetIPAddress() or "unknown" end
 
     -- Server info (always value 1, metadata carried as labels)
     metrics[#metrics + 1] = MakeGauge(
@@ -82,8 +86,8 @@ function GTelemetry.Collectors.Map.Collect()
         {MakeDataPoint(1, {
             Attribute("server.map", currentMap),
             Attribute("server.gamemode", gamemodeName),
-            Attribute("server.hostname", hostname),
-            Attribute("server.ip", serverIP),
+            Attribute("server.hostname", _cachedHostname),
+            Attribute("server.ip", _cachedIP),
         })}
     )
 
@@ -92,7 +96,7 @@ function GTelemetry.Collectors.Map.Collect()
         "gmod.map.changes",
         "Number of map changes since server process start",
         "{changes}",
-        {MakeCumulativeDataPoint(_mapChanges, _startTimeNano)},
+        {MakeCumulativeDataPoint(_mapChanges - _mapChangesAtInit, _startTimeNano)},
         true
     )
 

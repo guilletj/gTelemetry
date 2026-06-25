@@ -17,7 +17,7 @@
 
 -- Initialize global namespace
 GTelemetry = GTelemetry or {}
-GTelemetry.Version = "1.5.6"
+GTelemetry.Version = "1.5.7"
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 
 -- Client files in autorun/client are automatically sent to the client
@@ -35,9 +35,9 @@ function GTelemetry.PrintBanner()
         MsgC(cyan, "[gTelemetry] ", purple, "GMod Telemetry (v" .. GTelemetry.Version .. ")\n")
         MsgC(white, "Desarrollado por: ", yellow, "Edyone ", white, "para ", cyan, "Alienhost\n")
         MsgC(gray, "--------------------------------------------------\n")
-        MsgC(white, "🌐 Web:     ", cyan, "https://alienhost.net\n")
-        MsgC(white, "💬 Discord: ", cyan, "https://discord.gg/alienhost\n")
-        MsgC(white, "💻 GitHub:  ", cyan, "https://github.com/Edyone\n")
+        MsgC(white, "[WEB]     ", cyan, "https://alienhost.net\n")
+        MsgC(white, "[DISCORD] ", cyan, "https://discord.gg/alienhost\n")
+        MsgC(white, "[GITHUB]  ", cyan, "https://github.com/Edyone\n")
         MsgC(cyan, "==================================================\n\n")
     else
         local sep = string.rep("=", 50)
@@ -93,8 +93,15 @@ function GTelemetry.StartLogCollection()
 
     if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
         GTelemetry.Collectors.BLogs.Init()
+        GTelemetry._activeLogCollector = "blogs"
     else
         GTelemetry.Collectors.LogEvents.Init()
+        GTelemetry._activeLogCollector = "logevents"
+    end
+
+    if not GTelemetry.OTLP.Logs then
+        GTelemetry.Warn("GTelemetry.OTLP.Logs not available — log flush timer not created")
+        return
     end
 
     local interval = GTelemetry.Config.GetLogInterval()
@@ -112,7 +119,8 @@ hook.Add("InitPostEntity", "GTelemetry_Init", function()
         return
     end
 
-    if GetConVar("sv_hibernate_think"):GetInt() == 0 then
+    local hibernateCvar = GetConVar("sv_hibernate_think")
+    if hibernateCvar and hibernateCvar:GetInt() == 0 then
         GTelemetry.Log("WARNING: sv_hibernate_think is 0 — timers will NOT fire when no players are connected.")
         GTelemetry.Log("Set sv_hibernate_think 1 in server.cfg or add +sv_hibernate_think 1 to your launch args.")
     end
@@ -153,6 +161,14 @@ if game.GetMap() and game.GetMap() ~= "" then
                 GTelemetry.Collectors.Map.CountChange()
             end
 
+            -- Re-request client-ready signals from already-connected players
+            pcall(function()
+                for _, ply in ipairs(player.GetAll()) do
+                    net.Start("GTelemetry_RequestReady")
+                    net.Send(ply)
+                end
+            end)
+
             GTelemetry.Log("v" .. GTelemetry.Version .. " late-initialized")
             if GTelemetry.PrintBanner then
                 GTelemetry.PrintBanner()
@@ -177,7 +193,7 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
         GTelemetry.OTLP.CollectAndSend()
     end
 
-    if GTelemetry.Config.IsLogEnabled() then
+    if GTelemetry.Config.IsLogEnabled() and GTelemetry.OTLP.Logs then
         GTelemetry.Debug("Server shutting down, flushing logs...")
         GTelemetry.OTLP.Logs.Flush()
     end

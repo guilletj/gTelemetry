@@ -30,6 +30,7 @@ local Attribute = nil
 -- Register net messages for client data (must be outside Init to avoid race conditions)
 util.AddNetworkString("GTelemetry_ClientData")
 util.AddNetworkString("GTelemetry_ClientReady")
+util.AddNetworkString("GTelemetry_RequestReady")
 
 -- Clean up player data on disconnect (always active — net.Receive handlers
 -- are also permanent, so this prevents _playerData from leaking entries
@@ -61,7 +62,7 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
     end
     local data = _playerData[steamID]
-    if data and not data.loadTime then
+    if not data.loadTime or data.loadTime == -1 then
         data.loadTime = math_Round(SysTime() - data.loadStart, 2)
     end
 end)
@@ -131,13 +132,14 @@ function GTelemetry.Collectors.Players.Undo()
 end
 
 --- Collect player metrics.
+-- @param players table|nil pre-cached player list from CollectAndSend
 -- @return table list of OTLP metric objects
-function GTelemetry.Collectors.Players.Collect()
+function GTelemetry.Collectors.Players.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Players.Init() end
 
     local metrics = {}
-    local players = player.GetAll()
-    local playerCount = player.GetCount()
+    players = players or player.GetAll()
+    local playerCount = #players
     local botCount = 0
     local totalPing = 0
     local pingPoints = {}
@@ -186,8 +188,9 @@ function GTelemetry.Collectors.Players.Collect()
                     connectionPoints[#connectionPoints + 1] = MakeDataPoint(math_Round(connTime, 1), attrs)
 
                     -- Load time (reported once, after first spawn)
+                    -- -1 sentinel means client never sent ready signal within timeout
                     if data.loadTime then
-                        if data.loadTime > 0 then
+                        if data.loadTime ~= 0 then
                             loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
                         end
                     elseif curTime - data.connectTime > _clientLoadTimeout then

@@ -4,3 +4,6 @@
 *.log
 .DS_Store
 Thumbs.db
+PERF_ANALYSIS.md
+CLEANUP_PLAN.md
+BUGS.md

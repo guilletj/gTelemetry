@@ -16,6 +16,7 @@ GTelemetry.Collectors.BLogs = {}
 
 local _initialized = false
 local _module = nil
+local _modulePrevMap = nil
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
@@ -24,16 +25,8 @@ local SEVERITY_ERROR = 17
 local AddLog = nil
 local Attribute = nil
 local tostring = tostring
-local table_insert = table.insert
-
-local function safeConcat(t, sep)
-    if not t then return "" end
-    local parts = {}
-    for _, v in ipairs(t) do
-        parts[#parts + 1] = tostring(v)
-    end
-    return table.concat(parts, sep or " ")
-end
+local table_concat = table.concat
+local safeConcat = GTelemetry.Util.safeConcat
 
 function GTelemetry.Collectors.BLogs.IsAvailable()
     return GAS and GAS.Logging and type(GAS.Logging.MODULE) == "function"
@@ -53,10 +46,8 @@ function GTelemetry.Collectors.BLogs.Init()
         return
     end
 
-    AddLog = function(severity, text, body, attrs)
-        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
-    end
-    Attribute = GTelemetry.OTLP.Logs.Attribute
+    AddLog = GTelemetry.OTLP.Logs.AddLog
+    Attribute = GTelemetry.OTLP.Attribute
 
     local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
 
@@ -146,7 +137,7 @@ local _hookSpecs = {
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " exited " .. (IsValid(vehicle) and vehicle:GetClass() or "unknown"), {Attribute("log.source", "vehicle"), Attribute("log.event", "exit")})
     end},
-    {event = "OnLuaError", id = "gtelemetry_error", fn = function(error, realm, stack, name, id)
+    {event = "OnLuaError", id = "gtelemetry_error", fn = function(error, realm, stack, name)
         local source = name and "[" .. name .. "]" or ""
         local body = source .. " " .. tostring(error)
         if stack then body = body .. "\n" .. tostring(stack) end
@@ -156,7 +147,7 @@ local _hookSpecs = {
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. (args and safeConcat(args) or ""), {Attribute("log.source", "admin"), Attribute("admin.mod", "ulx")})
     end},
-    {event = "SAM.RanCommand", id = "gtelemetry_sam", fn = function(ply, cmd_name, args, cmd)
+    {event = "SAM.RanCommand", id = "gtelemetry_sam", fn = function(ply, cmd_name, args)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},
@@ -222,23 +213,26 @@ local _hookSpecs = {
     end},
     {event = "InitPostEntity", id = "gtelemetry_map", fn = function()
         local currentMap = game.GetMap() or "unknown"
-        if not _module._prevMap then
-            _module._prevMap = currentMap
+        if not _modulePrevMap then
+            _modulePrevMap = currentMap
             AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. currentMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
-        elseif _module._prevMap ~= currentMap then
-            AddLog(SEVERITY_INFO, "INFO", "Map changed: " .. _module._prevMap .. " -> " .. currentMap, {Attribute("log.source", "system"), Attribute("log.event", "map_change")})
-            _module._prevMap = currentMap
+        elseif _modulePrevMap ~= currentMap then
+            AddLog(SEVERITY_INFO, "INFO", "Map changed: " .. _modulePrevMap .. " -> " .. currentMap, {Attribute("log.source", "system"), Attribute("log.event", "map_change")})
+            _modulePrevMap = currentMap
         else
-            _module._prevMap = currentMap
+            _modulePrevMap = currentMap
         end
     end},
     {event = "gamemode.PostGamemodeLoaded", id = "gtelemetry_gamemode", fn = function()
         AddLog(SEVERITY_INFO, "INFO", "Gamemode loaded: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown"), {Attribute("log.source", "system"), Attribute("log.event", "gamemode_change")})
     end},
-    {event = "ShutDown", id = "gtelemetry_shutdown", fn = function()
-        AddLog(SEVERITY_WARN, "WARN", "Server shutting down", {Attribute("log.source", "system"), Attribute("log.event", "server_stop")})
-    end},
 }
+-- NOTE: ShutDown is NOT in _hookSpecs. It's registered via hook.Add() directly in _setupModule()
+-- with priority 10 to ensure it runs BEFORE the main flush hook at default priority 0.
+
+local function _shutdownHook()
+    AddLog(SEVERITY_WARN, "WARN", "Server shutting down", {Attribute("log.source", "system"), Attribute("log.event", "server_stop")})
+end
 
 local function _setupModule()
     _module = GAS.Logging:MODULE()
@@ -252,6 +246,9 @@ local function _setupModule()
         end
     end)
 
+    -- Register ShutDown directly with priority 10 so it runs BEFORE the main flush (priority 0)
+    hook.Add("ShutDown", "GTelemetry_BLogsShutdown", _shutdownHook, 10)
+
     GAS.Logging:AddModule(_module)
     GTelemetry.Debug("bLogs bridge registered " .. #_hookSpecs .. " hooks via MODULE:Hook()")
 end
@@ -260,6 +257,8 @@ local function _cleanupModule()
     for _, spec in ipairs(_hookSpecs) do
         pcall(hook.Remove, spec.event, spec.id)
     end
+    hook.Remove("ShutDown", "GTelemetry_BLogsShutdown")
+    pcall(function() GAS.Logging:RemoveModule(_module) end)
     _module = nil
     GTelemetry.Debug("bLogs bridge hooks removed")
 end
@@ -268,18 +267,16 @@ GTelemetry.Collectors.BLogs.Interceptor = {}
 
 local _interceptorActive = false
 local _origLogPhrase = nil
-local _origPhrase = nil
 local _origAddModule = nil
 local _restoreTarget = nil
 local _restoreKey = nil
+local _wrappedModules = nil -- { mod = originalFunction } for fallback path
 
 function GTelemetry.Collectors.BLogs.Interceptor.Install()
     if _interceptorActive then return end
 
-    AddLog = AddLog or function(severity, text, body, attrs)
-        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
-    end
-    Attribute = Attribute or GTelemetry.OTLP.Logs.Attribute
+    AddLog = AddLog or GTelemetry.OTLP.Logs.AddLog
+    Attribute = Attribute or GTelemetry.OTLP.Attribute
 
     local ok, found = pcall(function()
         local testModule = GAS.Logging:MODULE()
@@ -333,24 +330,33 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
         return
     end
 
+    _wrappedModules = {}
+
     _origAddModule = GAS.Logging.AddModule
     GAS.Logging.AddModule = function(self, mod)
         local result = _origAddModule(self, mod)
 
+        local entry = {}
         if type(mod.LogPhrase) == "function" then
+            entry.LogPhrase = mod.LogPhrase
             local orig = mod.LogPhrase
             mod.LogPhrase = function(innerSelf, ...)
                 local innerResults = {orig(innerSelf, ...)}
                 pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
                 return unpack(innerResults)
             end
-        elseif type(mod.Phrase) == "function" then
+        end
+        if type(mod.Phrase) == "function" then
+            entry.Phrase = mod.Phrase
             local orig = mod.Phrase
             mod.Phrase = function(innerSelf, ...)
                 local innerResults = {orig(innerSelf, ...)}
                 pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
                 return unpack(innerResults)
             end
+        end
+        if next(entry) then
+            _wrappedModules[mod] = entry
         end
 
         return result
@@ -372,7 +378,7 @@ function GTelemetry.Collectors.BLogs.Interceptor.OnLog(self, phraseKey, ...)
 
     local body = "[bLogs/" .. category .. "/" .. name .. "] " .. tostring(phraseKey)
     if #parts > 0 then
-        body = body .. ": " .. table.concat(parts, " | ")
+        body = body .. ": " .. table_concat(parts, " | ")
     end
 
     AddLog(SEVERITY_INFO, "INFO", body, {
@@ -390,6 +396,21 @@ function GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
     if _restoreTarget and _restoreKey and _origLogPhrase then
         _restoreTarget[_restoreKey] = _origLogPhrase
         GTelemetry.Debug("bLogs bridge: restored original " .. _restoreKey)
+    end
+
+    if _wrappedModules then
+        local count = 0
+        for mod, entry in pairs(_wrappedModules) do
+            count = count + 1
+            if entry.LogPhrase and type(mod.LogPhrase) == "function" and mod.LogPhrase ~= entry.LogPhrase then
+                mod.LogPhrase = entry.LogPhrase
+            end
+            if entry.Phrase and type(mod.Phrase) == "function" and mod.Phrase ~= entry.Phrase then
+                mod.Phrase = entry.Phrase
+            end
+        end
+        _wrappedModules = nil
+        GTelemetry.Debug("bLogs bridge: restored " .. count .. " wrapped modules")
     end
 
     if _origAddModule then

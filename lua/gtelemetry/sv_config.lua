@@ -11,9 +11,22 @@
 
 GTelemetry.Config = GTelemetry.Config or {}
 
+local tostring = tostring
 local table_insert = table.insert
 local table_concat = table.concat
 local string_match = string.match
+
+-- Shared utilities
+GTelemetry.Util = GTelemetry.Util or {}
+
+function GTelemetry.Util.safeConcat(t, sep)
+    if not t then return "" end
+    local parts = {}
+    for _, v in ipairs(t) do
+        parts[#parts + 1] = tostring(v)
+    end
+    return table_concat(parts, sep or " ")
+end
 
 -- ConVar definitions
 GTelemetry.Config.ConVars = {
@@ -71,9 +84,9 @@ GTelemetry.Config.ConVars = {
     ),
 
     entities_interval = CreateConVar(
-        "gtelemetry_entities_interval", "1",
+        "gtelemetry_entities_interval", "5",
         FCVAR_ARCHIVE,
-        "Collect entity metrics every N cycles (1 = every cycle, 2 = every other, etc.). Higher values reduce CPU on large maps.",
+        "Collect entity metrics every N cycles (1 = every cycle, 5 = every fifth, etc.). Higher values reduce CPU on large maps.",
         1, 20
     ),
 
@@ -85,7 +98,7 @@ GTelemetry.Config.ConVars = {
     ),
 
     version = CreateConVar(
-        "gtelemetry_version", GTelemetry.Version or "1.5.6",
+        "gtelemetry_version", GTelemetry.Version or "1.5.7",
         FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
         "Version of gTelemetry currently running."
     ),
@@ -319,6 +332,10 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         else
             GTelemetry.Warn("GTelemetry.StartCollection not available yet (modules still loading)")
         end
+        -- Re-init log hooks if they were stopped by toggling off
+        if GTelemetry.Config.IsLogEnabled() and GTelemetry.StartLogCollection then
+            GTelemetry.StartLogCollection()
+        end
     else
         GTelemetry.Log("Telemetry disabled")
         if timer.Exists("GTelemetry_Collect") then
@@ -349,7 +366,7 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
         end
-        if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
+        if GTelemetry._activeLogCollector == "blogs" then
             if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Undo then
                 GTelemetry.Collectors.BLogs.Undo()
             end
@@ -358,8 +375,22 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
                 GTelemetry.Collectors.LogEvents.Undo()
             end
         end
+        GTelemetry._activeLogCollector = nil
     end
 end, "gtelemetry_log_enabled_change")
+
+-- Reset backoff when endpoint changes
+cvars.AddChangeCallback("gtelemetry_endpoint", function()
+    if GTelemetry.OTLP and GTelemetry.OTLP.ResetBackoff then
+        GTelemetry.OTLP.ResetBackoff()
+    end
+end, "gtelemetry_endpoint_change")
+
+cvars.AddChangeCallback("gtelemetry_log_endpoint", function()
+    if GTelemetry.OTLP and GTelemetry.OTLP.Logs and GTelemetry.OTLP.Logs.ResetBackoff then
+        GTelemetry.OTLP.Logs.ResetBackoff()
+    end
+end, "gtelemetry_log_endpoint_change")
 
 -- Listen for bLogs mode changes
 cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)

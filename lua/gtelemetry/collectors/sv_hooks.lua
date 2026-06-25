@@ -35,6 +35,13 @@ local table_sort = table.sort
 
 local _maxHookCardinality = 20  -- Max unique hook events to report
 
+-- Hook table iteration is expensive (deep copies the entire hook registry).
+-- Skip N-1 out of N cycles and reuse cached values.
+local _hooksCycleCount = 0
+local _hooksSkipEvery = 5
+local _lastTotalHooks = 0
+local _lastEventCounts = {}
+
 function GTelemetry.Collectors.Hooks.Init()
     if _initialized then return end
     _initialized = true
@@ -45,6 +52,9 @@ function GTelemetry.Collectors.Hooks.Init()
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+    _hooksCycleCount = 0
+    _lastTotalHooks = 0
+    _lastEventCounts = {}
 
     -- Measure Think execution time via pre/post hooks.
     -- Priority 10 runs before all default-priority (0) hooks.
@@ -69,7 +79,7 @@ function GTelemetry.Collectors.Hooks.Init()
     end, -10)
 
     -- Track Lua errors
-    hook.Add("OnLuaError", "GTelemetry_LuaErrors", function(error, realm, stack, name, id)
+    hook.Add("OnLuaError", "GTelemetry_LuaErrors", function(...)
         _luaErrors = _luaErrors + 1
     end)
 
@@ -127,7 +137,16 @@ function GTelemetry.Collectors.Hooks.Collect()
     if not MakeGauge then GTelemetry.Collectors.Hooks.Init() end
 
     local metrics = {}
-    local totalHooks, eventCounts = CountHooks()
+    local totalHooks, eventCounts
+    _hooksCycleCount = (_hooksCycleCount + 1) % _hooksSkipEvery
+    if _hooksCycleCount == 1 then
+        totalHooks, eventCounts = CountHooks()
+        _lastTotalHooks = totalHooks
+        _lastEventCounts = eventCounts
+    else
+        totalHooks = _lastTotalHooks
+        eventCounts = _lastEventCounts
+    end
 
     -- Total hook count
     metrics[#metrics + 1] = MakeGauge(

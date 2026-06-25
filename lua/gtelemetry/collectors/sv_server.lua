@@ -53,20 +53,24 @@ function GTelemetry.Collectors.Server.Collect()
     local curTime = CurTime()
 
     -- Tick rate (configured)
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.server.tickrate",
-        "Configured server tick rate",
-        "Hz",
-        {MakeDataPoint(math_Round(1 / tickInterval))}
-    )
+    if tickInterval and tickInterval > 0 then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.server.tickrate",
+            "Configured server tick rate",
+            "Hz",
+            {MakeDataPoint(math_Round(1 / tickInterval))}
+        )
+    end
 
     -- Tick interval
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.server.tick_interval",
-        "Time between server ticks",
-        "s",
-        {MakeDataPoint(tickInterval)}
-    )
+    if tickInterval then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.server.tick_interval",
+            "Time between server ticks",
+            "s",
+            {MakeDataPoint(tickInterval)}
+        )
+    end
 
     -- Server frame time (actual time the last frame took)
     metrics[#metrics + 1] = MakeGauge(
@@ -78,7 +82,7 @@ function GTelemetry.Collectors.Server.Collect()
 
     -- Tick duration ratio (frameTime / tickInterval — how loaded the server is)
     -- > 1.0 means the server cannot keep up with the configured tick rate
-    if tickInterval > 0 then
+    if tickInterval and tickInterval > 0 then
         metrics[#metrics + 1] = MakeGauge(
             "gmod.server.tick_duration",
             "Ratio of frame time to tick interval — server load indicator. >1 means overloaded.",

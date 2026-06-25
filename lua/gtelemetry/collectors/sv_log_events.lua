@@ -21,17 +21,7 @@ local _serverStarted = false
 local tostring = tostring
 local AddLog = nil
 local Attribute = nil
-
-local table_insert = table.insert
-
-local function safeConcat(t, sep)
-    if not t then return "" end
-    local parts = {}
-    for _, v in ipairs(t) do
-        parts[#parts + 1] = tostring(v)
-    end
-    return table.concat(parts, sep or " ")
-end
+local safeConcat = GTelemetry.Util.safeConcat
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
@@ -46,10 +36,8 @@ function GTelemetry.Collectors.LogEvents.Init()
         return
     end
 
-    AddLog = function(severity, text, body, attrs)
-        GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
-    end
-    Attribute = GTelemetry.OTLP.Logs.Attribute
+    AddLog = GTelemetry.OTLP.Logs.AddLog
+    Attribute = GTelemetry.OTLP.Attribute
 
     -- Local ref for perf
     local IsLogSpawnEnabled = GTelemetry.Config.IsLogSpawnEnabled
@@ -171,7 +159,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- ════════════════════════════════════════════════════════════
     -- Lua errors
     -- ════════════════════════════════════════════════════════════
-    hook.Add("OnLuaError", "GTelemetry_LogError", function(error, realm, stack, name, id)
+    hook.Add("OnLuaError", "GTelemetry_LogError", function(error, realm, stack, name)
         local source = name and "[" .. name .. "]" or ""
         local body = source .. " " .. tostring(error)
         if stack then
@@ -198,7 +186,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     -- SAM (current hook: SAM.RanCommand)
-    hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args, cmd)
+    hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. argsStr
@@ -382,14 +370,12 @@ function GTelemetry.Collectors.LogEvents.Init()
                 Attribute("log.source", "system"),
                 Attribute("log.event", "server_start"),
             })
-        elseif _prevMap and _prevMap ~= currentMap then
+        else
             local body = "Map changed: " .. _prevMap .. " -> " .. currentMap
             AddLog(SEVERITY_INFO, "INFO", body, {
                 Attribute("log.source", "system"),
                 Attribute("log.event", "map_change"),
             })
-            _prevMap = currentMap
-        else
             _prevMap = currentMap
         end
     end)
