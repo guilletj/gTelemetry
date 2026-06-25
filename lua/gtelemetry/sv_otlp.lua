@@ -45,6 +45,12 @@ hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
     _cachedGamemode = nil
 end)
 
+-- Reset backoff (called when endpoint ConVar changes)
+function GTelemetry.OTLP.ResetBackoff()
+    _backoffAttempts = 0
+    _nextSendTime = 0
+end
+
 -- Guard to prevent concurrent collection cycles from stacking
 local _isCollecting = false
 

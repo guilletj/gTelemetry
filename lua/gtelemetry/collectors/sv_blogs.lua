@@ -16,6 +16,7 @@ GTelemetry.Collectors.BLogs = {}
 
 local _initialized = false
 local _module = nil
+local _modulePrevMap = nil
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
@@ -222,14 +223,14 @@ local _hookSpecs = {
     end},
     {event = "InitPostEntity", id = "gtelemetry_map", fn = function()
         local currentMap = game.GetMap() or "unknown"
-        if not _module._prevMap then
-            _module._prevMap = currentMap
+        if not _modulePrevMap then
+            _modulePrevMap = currentMap
             AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. currentMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
-        elseif _module._prevMap ~= currentMap then
-            AddLog(SEVERITY_INFO, "INFO", "Map changed: " .. _module._prevMap .. " -> " .. currentMap, {Attribute("log.source", "system"), Attribute("log.event", "map_change")})
-            _module._prevMap = currentMap
+        elseif _modulePrevMap ~= currentMap then
+            AddLog(SEVERITY_INFO, "INFO", "Map changed: " .. _modulePrevMap .. " -> " .. currentMap, {Attribute("log.source", "system"), Attribute("log.event", "map_change")})
+            _modulePrevMap = currentMap
         else
-            _module._prevMap = currentMap
+            _modulePrevMap = currentMap
         end
     end},
     {event = "gamemode.PostGamemodeLoaded", id = "gtelemetry_gamemode", fn = function()
@@ -260,6 +261,7 @@ local function _cleanupModule()
     for _, spec in ipairs(_hookSpecs) do
         pcall(hook.Remove, spec.event, spec.id)
     end
+    pcall(function() GAS.Logging:RemoveModule(_module) end)
     _module = nil
     GTelemetry.Debug("bLogs bridge hooks removed")
 end
@@ -272,6 +274,7 @@ local _origPhrase = nil
 local _origAddModule = nil
 local _restoreTarget = nil
 local _restoreKey = nil
+local _wrappedModules = nil -- { mod = originalFunction } for fallback path
 
 function GTelemetry.Collectors.BLogs.Interceptor.Install()
     if _interceptorActive then return end
@@ -333,11 +336,14 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
         return
     end
 
+    _wrappedModules = {}
+
     _origAddModule = GAS.Logging.AddModule
     GAS.Logging.AddModule = function(self, mod)
         local result = _origAddModule(self, mod)
 
         if type(mod.LogPhrase) == "function" then
+            _wrappedModules[mod] = mod.LogPhrase
             local orig = mod.LogPhrase
             mod.LogPhrase = function(innerSelf, ...)
                 local innerResults = {orig(innerSelf, ...)}
@@ -345,6 +351,7 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
                 return unpack(innerResults)
             end
         elseif type(mod.Phrase) == "function" then
+            _wrappedModules[mod] = mod.Phrase
             local orig = mod.Phrase
             mod.Phrase = function(innerSelf, ...)
                 local innerResults = {orig(innerSelf, ...)}
@@ -390,6 +397,21 @@ function GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
     if _restoreTarget and _restoreKey and _origLogPhrase then
         _restoreTarget[_restoreKey] = _origLogPhrase
         GTelemetry.Debug("bLogs bridge: restored original " .. _restoreKey)
+    end
+
+    if _wrappedModules then
+        local count = 0
+        for mod, orig in pairs(_wrappedModules) do
+            count = count + 1
+            if type(mod.LogPhrase) == "function" and mod.LogPhrase ~= orig then
+                mod.LogPhrase = orig
+            end
+            if type(mod.Phrase) == "function" and mod.Phrase ~= orig then
+                mod.Phrase = orig
+            end
+        end
+        _wrappedModules = nil
+        GTelemetry.Debug("bLogs bridge: restored " .. count .. " wrapped modules")
     end
 
     if _origAddModule then

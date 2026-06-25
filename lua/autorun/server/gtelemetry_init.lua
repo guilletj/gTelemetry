@@ -93,8 +93,10 @@ function GTelemetry.StartLogCollection()
 
     if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
         GTelemetry.Collectors.BLogs.Init()
+        GTelemetry._activeLogCollector = "blogs"
     else
         GTelemetry.Collectors.LogEvents.Init()
+        GTelemetry._activeLogCollector = "logevents"
     end
 
     local interval = GTelemetry.Config.GetLogInterval()
@@ -152,6 +154,14 @@ if game.GetMap() and game.GetMap() ~= "" then
             if GTelemetry.Collectors.Map and GTelemetry.Collectors.Map.CountChange then
                 GTelemetry.Collectors.Map.CountChange()
             end
+
+            -- Re-request client-ready signals from already-connected players
+            pcall(function()
+                for _, ply in ipairs(player.GetAll()) do
+                    net.Start("GTelemetry_RequestReady")
+                    net.Send(ply)
+                end
+            end)
 
             GTelemetry.Log("v" .. GTelemetry.Version .. " late-initialized")
             if GTelemetry.PrintBanner then

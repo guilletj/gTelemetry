@@ -72,15 +72,15 @@ local function ClassifyEntity(ent, class)
         return ENTITY_RAGDOLL
     elseif string_StartWith(class, "prop_door") then
         return ENTITY_DOOR
-    elseif string_StartWith(class, "prop_") then
-        return ENTITY_PROPS
     elseif string_StartWith(class, "npc_") then
         return ENTITY_NPC
     elseif ent:IsWeapon() then
         return ENTITY_WEAPON
     elseif ent:IsVehicle() then
         return ENTITY_VEHICLE
-    elseif string_StartWith(class, "prop_door") or string_StartWith(class, "func_door") then
+    elseif string_StartWith(class, "prop_") then
+        return ENTITY_PROPS
+    elseif string_StartWith(class, "func_door") then
         return ENTITY_DOOR
     elseif string_StartWith(class, "sent_") or string_StartWith(class, "gmod_") then
         return ENTITY_SCRIPTED
@@ -164,7 +164,7 @@ function GTelemetry.Collectors.Entities.Collect()
             end
 
             -- Owner detection (always — used for world vs player breakdown)
-            local owner = ent.CPPIGetOwner and ent:CPPIGetOwner()
+            local owner = type(ent.CPPIGetOwner) == "function" and ent:CPPIGetOwner()
             if not IsValid(owner) then
                 owner = ent.GetCreator and ent:GetCreator()
             end

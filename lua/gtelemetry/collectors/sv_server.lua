@@ -53,12 +53,14 @@ function GTelemetry.Collectors.Server.Collect()
     local curTime = CurTime()
 
     -- Tick rate (configured)
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.server.tickrate",
-        "Configured server tick rate",
-        "Hz",
-        {MakeDataPoint(math_Round(1 / tickInterval))}
-    )
+    if tickInterval and tickInterval > 0 then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.server.tickrate",
+            "Configured server tick rate",
+            "Hz",
+            {MakeDataPoint(math_Round(1 / tickInterval))}
+        )
+    end
 
     -- Tick interval
     metrics[#metrics + 1] = MakeGauge(

@@ -382,14 +382,12 @@ function GTelemetry.Collectors.LogEvents.Init()
                 Attribute("log.source", "system"),
                 Attribute("log.event", "server_start"),
             })
-        elseif _prevMap and _prevMap ~= currentMap then
+        else
             local body = "Map changed: " .. _prevMap .. " -> " .. currentMap
             AddLog(SEVERITY_INFO, "INFO", body, {
                 Attribute("log.source", "system"),
                 Attribute("log.event", "map_change"),
             })
-            _prevMap = currentMap
-        else
             _prevMap = currentMap
         end
     end)

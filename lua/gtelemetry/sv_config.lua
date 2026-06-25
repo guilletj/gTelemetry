@@ -349,7 +349,7 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
         end
-        if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
+        if GTelemetry._activeLogCollector == "blogs" then
             if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Undo then
                 GTelemetry.Collectors.BLogs.Undo()
             end
@@ -358,8 +358,22 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
                 GTelemetry.Collectors.LogEvents.Undo()
             end
         end
+        GTelemetry._activeLogCollector = nil
     end
 end, "gtelemetry_log_enabled_change")
+
+-- Reset backoff when endpoint changes
+cvars.AddChangeCallback("gtelemetry_endpoint", function()
+    if GTelemetry.OTLP and GTelemetry.OTLP.ResetBackoff then
+        GTelemetry.OTLP.ResetBackoff()
+    end
+end, "gtelemetry_endpoint_change")
+
+cvars.AddChangeCallback("gtelemetry_log_endpoint", function()
+    if GTelemetry.OTLP and GTelemetry.OTLP.Logs and GTelemetry.OTLP.Logs.ResetBackoff then
+        GTelemetry.OTLP.Logs.ResetBackoff()
+    end
+end, "gtelemetry_log_endpoint_change")
 
 -- Listen for bLogs mode changes
 cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)

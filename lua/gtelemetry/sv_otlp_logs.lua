@@ -17,13 +17,13 @@ local SysTime = SysTime
 local tostring = tostring
 local string_format = string.format
 local table_insert = table.insert
-local table_remove = table.remove
 local pairs = pairs
 local math_min = math.min
 local math_floor = math.floor
 
 local _logBuffer = {}
 local _bufferSize = 0
+local _bufferStart = 1
 local _initialized = false
 
 GTelemetry.OTLP.Logs.SendFailures = 0
@@ -38,6 +38,11 @@ local _cachedGamemode = nil
 hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_Logs_GamemodeCache", function()
     _cachedGamemode = nil
 end)
+
+function GTelemetry.OTLP.Logs.ResetBackoff()
+    _backoffAttempts = 0
+    _nextSendTime = 0
+end
 
 function GTelemetry.OTLP.Logs.Init()
     if _initialized then return end
@@ -84,12 +89,13 @@ function GTelemetry.OTLP.Logs.AddLog(severityNumber, severityText, body, attribu
 
     local maxSize = GTelemetry.Config.GetLogBufferSize()
     if _bufferSize >= maxSize then
-        table_remove(_logBuffer, 1)
+        _logBuffer[_bufferStart] = nil
+        _bufferStart = _bufferStart + 1
         GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + 1
         _bufferSize = _bufferSize - 1
     end
 
-    table_insert(_logBuffer, record)
+    _logBuffer[_bufferStart + _bufferSize] = record
     _bufferSize = _bufferSize + 1
 end
 
@@ -195,8 +201,13 @@ function GTelemetry.OTLP.Logs.Flush()
     end
     _isFlushing = true
 
-    local records = _logBuffer
+    local records = {}
+    for i = 0, _bufferSize - 1 do
+        records[i + 1] = _logBuffer[_bufferStart + i]
+        _logBuffer[_bufferStart + i] = nil
+    end
     _logBuffer = {}
+    _bufferStart = 1
     _bufferSize = 0
 
     local success, result = pcall(function()
@@ -227,6 +238,10 @@ end
 
 --- Clear buffer without sending.
 function GTelemetry.OTLP.Logs.ClearBuffer()
+    for i = 0, _bufferSize - 1 do
+        _logBuffer[_bufferStart + i] = nil
+    end
     _logBuffer = {}
+    _bufferStart = 1
     _bufferSize = 0
 end
