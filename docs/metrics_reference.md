@@ -31,7 +31,7 @@ All metrics are prefixed with `gmod.` for easy filtering.
 | `gmod.players.kills` | Sum | `player.name`, `player.steam_id` | Cumulative kills |
 | `gmod.players.deaths` | Sum | `player.name`, `player.steam_id` | Cumulative deaths |
 | `gmod.players.connection_time` | Gauge | `player.name`, `player.steam_id` | Time connected (s) |
-| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Connect-to-ready time (s). Emits `-1` once if client never reported ready within 120s |
+| `gmod.players.load_time` | Gauge | `player.name`, `player.steam_id` | Connect-to-ready time (s). Emits `-1` if client never reports ready within 120s; overwritten with real time if `ClientReady` arrives later |
 
 ## Entities (`sv_entities.lua`)
 
