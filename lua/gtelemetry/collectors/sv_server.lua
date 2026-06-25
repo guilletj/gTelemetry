@@ -82,7 +82,7 @@ function GTelemetry.Collectors.Server.Collect()
 
     -- Tick duration ratio (frameTime / tickInterval — how loaded the server is)
     -- > 1.0 means the server cannot keep up with the configured tick rate
-    if tickInterval > 0 then
+    if tickInterval and tickInterval > 0 then
         metrics[#metrics + 1] = MakeGauge(
             "gmod.server.tick_duration",
             "Ratio of frame time to tick interval — server load indicator. >1 means overloaded.",
