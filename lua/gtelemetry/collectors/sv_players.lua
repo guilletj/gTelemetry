@@ -230,14 +230,13 @@ function GTelemetry.Collectors.Players.Collect(players)
 
     -- Average ping
     local humanCount = playerCount - botCount
-    if humanCount > 0 then
-        metrics[#metrics + 1] = MakeGauge(
-            "gmod.players.ping_avg",
-            "Average ping across all human players",
-            "ms",
-            {MakeDataPoint(math_Round(totalPing / humanCount, 1))}
-        )
-    end
+    local avgPing = humanCount > 0 and math_Round(totalPing / humanCount, 1) or 0
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.players.ping_avg",
+        "Average ping across all human players",
+        "ms",
+        {MakeDataPoint(avgPing)}
+    )
 
     -- Client FPS
     if #fpsPoints > 0 then
