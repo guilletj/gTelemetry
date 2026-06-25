@@ -11,7 +11,7 @@ All metrics are prefixed with `gmod.` for easy filtering.
 | `gmod.server.frametime` | Gauge | Actual server frame time (s) |
 | `gmod.server.fps` | Gauge | Server frames per second |
 | `gmod.server.lua_memory` | Gauge | Lua state memory usage (bytes) |
-| `gmod.server.uptime` | Gauge | Server uptime since map load (s) |
+| `gmod.server.uptime` | Gauge | Server uptime (s) |
 | `gmod.server.max_players` | Gauge | Maximum player slots |
 | `gmod.server.tick_duration` | Gauge | Ratio of frameTime to tickInterval. > 1 means overloaded |
 | `gmod.server.collection_duration` | Gauge | Time spent collecting and sending in the last cycle (s) |

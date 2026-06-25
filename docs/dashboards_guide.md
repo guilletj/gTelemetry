@@ -116,7 +116,7 @@ gmod_server_uptime_seconds
 |----------|-------|
 | Visualization | Stat |
 | Unit | `dthms` (duration) |
-| Description | Time since last map load. |
+| Description | Time since server start. |
 
 #### Collection Duration
 ```promql

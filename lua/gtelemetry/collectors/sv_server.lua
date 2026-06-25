@@ -32,7 +32,6 @@ function GTelemetry.Collectors.Server.Init()
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
-    _serverStartSysTime = SysTime()
 end
 
 function GTelemetry.Collectors.Server.Undo()
@@ -43,7 +42,6 @@ function GTelemetry.Collectors.Server.Undo()
     MakeSum = nil
     MakeCumulativeDataPoint = nil
     _startTimeNano = nil
-    _serverStartSysTime = nil
 end
 
 --- Collect server performance metrics.
