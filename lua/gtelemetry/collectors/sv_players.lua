@@ -139,7 +139,7 @@ function GTelemetry.Collectors.Players.Collect(players)
 
     local metrics = {}
     players = players or player.GetAll()
-    local playerCount = player.GetCount()
+    local playerCount = #players
     local botCount = 0
     local totalPing = 0
     local pingPoints = {}

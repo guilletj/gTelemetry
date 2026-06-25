@@ -52,6 +52,9 @@ function GTelemetry.Collectors.Hooks.Init()
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+    _hooksCycleCount = 0
+    _lastTotalHooks = 0
+    _lastEventCounts = {}
 
     -- Measure Think execution time via pre/post hooks.
     -- Priority 10 runs before all default-priority (0) hooks.

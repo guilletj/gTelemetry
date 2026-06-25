@@ -113,6 +113,7 @@ function GTelemetry.Collectors.Entities.Init()
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
+    _cycleCount = 0
 end
 
 function GTelemetry.Collectors.Entities.Undo()

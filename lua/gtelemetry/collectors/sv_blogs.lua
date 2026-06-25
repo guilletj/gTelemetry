@@ -137,7 +137,7 @@ local _hookSpecs = {
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " exited " .. (IsValid(vehicle) and vehicle:GetClass() or "unknown"), {Attribute("log.source", "vehicle"), Attribute("log.event", "exit")})
     end},
-    {event = "OnLuaError", id = "gtelemetry_error", fn = function(error, realm, stack, name, id)
+    {event = "OnLuaError", id = "gtelemetry_error", fn = function(error, realm, stack, name)
         local source = name and "[" .. name .. "]" or ""
         local body = source .. " " .. tostring(error)
         if stack then body = body .. "\n" .. tostring(stack) end

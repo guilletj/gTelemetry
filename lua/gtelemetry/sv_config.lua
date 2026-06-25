@@ -332,6 +332,10 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         else
             GTelemetry.Warn("GTelemetry.StartCollection not available yet (modules still loading)")
         end
+        -- Re-init log hooks if they were stopped by toggling off
+        if GTelemetry.Config.IsLogEnabled() and GTelemetry.StartLogCollection then
+            GTelemetry.StartLogCollection()
+        end
     else
         GTelemetry.Log("Telemetry disabled")
         if timer.Exists("GTelemetry_Collect") then

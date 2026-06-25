@@ -159,7 +159,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- ════════════════════════════════════════════════════════════
     -- Lua errors
     -- ════════════════════════════════════════════════════════════
-    hook.Add("OnLuaError", "GTelemetry_LogError", function(error, realm, stack, name, id)
+    hook.Add("OnLuaError", "GTelemetry_LogError", function(error, realm, stack, name)
         local source = name and "[" .. name .. "]" or ""
         local body = source .. " " .. tostring(error)
         if stack then
