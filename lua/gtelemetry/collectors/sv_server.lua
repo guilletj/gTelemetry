@@ -63,12 +63,14 @@ function GTelemetry.Collectors.Server.Collect()
     end
 
     -- Tick interval
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.server.tick_interval",
-        "Time between server ticks",
-        "s",
-        {MakeDataPoint(tickInterval)}
-    )
+    if tickInterval then
+        metrics[#metrics + 1] = MakeGauge(
+            "gmod.server.tick_interval",
+            "Time between server ticks",
+            "s",
+            {MakeDataPoint(tickInterval)}
+        )
+    end
 
     -- Server frame time (actual time the last frame took)
     metrics[#metrics + 1] = MakeGauge(
