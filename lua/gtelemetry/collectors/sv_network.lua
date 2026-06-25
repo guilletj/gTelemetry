@@ -20,6 +20,10 @@ local _netMessagesSentByName = {}
 local _netMessagesReceivedByName = {}
 local _startTimeNano = nil
 local _initialized = false
+
+-- Reset detail tables when they exceed this many entries to prevent unbounded growth.
+-- Cumulative counters (_netMessagesSent/_netMessagesReceived) remain accurate.
+local _maxDetailEntries = 1000
 local _originalNetStart = nil
 local _originalNetReceive = nil
 
@@ -124,6 +128,17 @@ function GTelemetry.Collectors.Network.Collect()
         true
     )
 
+    -- Reset detail name tables when they exceed _maxDetailEntries to prevent unbounded growth.
+    -- We check the first table as proxy (both grow at similar rates).
+    if _netMessagesSentByName and next(_netMessagesSentByName) ~= nil then
+        local count = 0
+        for _ in pairs(_netMessagesSentByName) do count = count + 1 if count > _maxDetailEntries then break end end
+        if count > _maxDetailEntries then
+            _netMessagesSentByName = {}
+            _netMessagesReceivedByName = {}
+        end
+    end
+
     -- Net messages sent per name (high cardinality — gated)
     if GTelemetry.Config.IsNetworkDetailsEnabled() then
         local outPoints = {}
@@ -174,14 +189,22 @@ function GTelemetry.Collectors.Network.Collect()
         )
     end
 
-    -- Average packet loss across all players
+    -- Packet loss: single pass for both average and per-player
     local players = player.GetAll()
     local totalLoss = 0
     local humanCount = 0
+    local lossPoints = {}
     for _, ply in ipairs(players) do
         if IsValid(ply) and not ply:IsBot() then
-            totalLoss = totalLoss + (ply.PacketLoss and ply:PacketLoss() or 0)
+            local loss = ply.PacketLoss and ply:PacketLoss() or 0
+            totalLoss = totalLoss + loss
             humanCount = humanCount + 1
+            if loss > 0 then
+                lossPoints[#lossPoints + 1] = MakeDataPoint(loss, {
+                    Attribute("player.name", ply:Nick()),
+                    Attribute("player.steam_id", ply:SteamID()),
+                })
+            end
         end
     end
 
@@ -192,20 +215,6 @@ function GTelemetry.Collectors.Network.Collect()
             "%",
             {MakeDataPoint(math_Round(totalLoss / humanCount, 2))}
         )
-    end
-
-    -- Per-player packet loss
-    local lossPoints = {}
-    for _, ply in ipairs(players) do
-        if IsValid(ply) and not ply:IsBot() and ply.PacketLoss then
-            local loss = ply:PacketLoss()
-            if loss > 0 then
-                lossPoints[#lossPoints + 1] = MakeDataPoint(loss, {
-                    Attribute("player.name", ply:Nick()),
-                    Attribute("player.steam_id", ply:SteamID()),
-                })
-            end
-        end
     end
 
     if #lossPoints > 0 then

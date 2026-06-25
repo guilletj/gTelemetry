@@ -14,6 +14,7 @@ GTelemetry.Collectors.Entities = {}
 local pairs = pairs
 local ipairs = ipairs
 local string_StartWith = string.StartWith
+local string_match = string.match
 local MakeGauge = nil
 local MakeDataPoint = nil
 local Attribute = nil
@@ -44,62 +45,59 @@ local _typeNames = {
     [ENTITY_EFFECT] = "effect",
 }
 
--- Entity classes that NEVER have physics objects (blacklist for GetPhysicsObject optimization)
-local _noPhysicsPrefix = {
-    env_ = true,
-    point_ = true,
-    info_ = true,
-    path_ = true,
-    logic_ = true,
-    ai_ = true,
-    trigger_ = true,
-    item_ = true,
-    math_ = true,
-    scene_ = true,
-    shadow_ = true,
-    sprite_ = true,
-    light_ = true,
-}
+-- Class cache: class names never change, so cache classification results.
+-- Normal table is fine (<200 unique classes per map).
+local _classCache = {}
 
---- Classify an entity into a numeric type.
+-- Pattern match for physics-less prefixes: env_, point_, info_, path_, logic_,
+-- ai_, trigger_, item_, math_, scene_, shadow_, sprite_, light_
+-- Single regex replaces 12-entry table iteration.
+local _physicsNoMatch = "^[aeilmpst]"
+
+--- Classify an entity into a numeric type. Results cached by class string.
 -- @param ent Entity
 -- @param class string pre-fetched class name
 -- @return number entity type constant
 local function ClassifyEntity(ent, class)
+    local cached = _classCache[class]
+    if cached then return cached end
+    local result
     if string_StartWith(class, "prop_physics") then
-        return ENTITY_PROPS
+        result = ENTITY_PROPS
     elseif class == "prop_ragdoll" then
-        return ENTITY_RAGDOLL
+        result = ENTITY_RAGDOLL
     elseif string_StartWith(class, "prop_door") then
-        return ENTITY_DOOR
+        result = ENTITY_DOOR
     elseif string_StartWith(class, "npc_") then
-        return ENTITY_NPC
+        result = ENTITY_NPC
     elseif ent:IsWeapon() then
-        return ENTITY_WEAPON
+        result = ENTITY_WEAPON
     elseif ent:IsVehicle() then
-        return ENTITY_VEHICLE
+        result = ENTITY_VEHICLE
     elseif string_StartWith(class, "prop_") then
-        return ENTITY_PROPS
+        result = ENTITY_PROPS
     elseif string_StartWith(class, "func_door") then
-        return ENTITY_DOOR
+        result = ENTITY_DOOR
     elseif string_StartWith(class, "sent_") or string_StartWith(class, "gmod_") then
-        return ENTITY_SCRIPTED
+        result = ENTITY_SCRIPTED
     elseif string_StartWith(class, "constraint_") or string_StartWith(class, "rope_") or string_StartWith(class, "hydraulic_") then
-        return ENTITY_CONSTRAINT
+        result = ENTITY_CONSTRAINT
     elseif string_StartWith(class, "env_") then
-        return ENTITY_EFFECT
+        result = ENTITY_EFFECT
+    else
+        result = ENTITY_OTHER
     end
-    return ENTITY_OTHER
+    _classCache[class] = result
+    return result
 end
 
 --- Check if an entity class may have a physics object (avoids expensive GetPhysicsObject call on known non-physics entities).
+-- Uses single regex match instead of iterating 12 prefixes.
+-- Matches classes starting with: a, e, i, l, m, p, s, t (env_, point_, info_, path_, logic_, ai_, trigger_, item_, math_, scene_, shadow_, sprite_, light_)
 -- @param class string class name
 -- @return boolean
 local function EntityHasPhysics(class)
-    for prefix in pairs(_noPhysicsPrefix) do
-        if string_StartWith(class, prefix) then return false end
-    end
-    return true
+    return not string_match(class, _physicsNoMatch)
 end
 
 local function TypeName(t)

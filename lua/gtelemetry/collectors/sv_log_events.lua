@@ -22,8 +22,6 @@ local tostring = tostring
 local AddLog = nil
 local Attribute = nil
 
-local table_insert = table.insert
-
 local function safeConcat(t, sep)
     if not t then return "" end
     local parts = {}
@@ -49,7 +47,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     AddLog = function(severity, text, body, attrs)
         GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
     end
-    Attribute = GTelemetry.OTLP.Logs.Attribute
+    Attribute = GTelemetry.OTLP.Attribute
 
     -- Local ref for perf
     local IsLogSpawnEnabled = GTelemetry.Config.IsLogSpawnEnabled

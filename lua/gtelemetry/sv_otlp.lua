@@ -210,6 +210,44 @@ function GTelemetry.OTLP.BuildPayload(metrics)
     return util_TableToJSON(payload)
 end
 
+--- Shared HTTP POST helper for OTLP payloads.
+-- Handles content-type headers, auth token, and the HTTP() call.
+-- @param endpoint string URL to POST to
+-- @param body string JSON body
+-- @param callbacks table { onSuccess = fn(), onFailure = fn(errMsg) }
+function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
+    local headers = {
+        ["Content-Type"] = "application/json",
+    }
+
+    local token = GTelemetry.Config.GetAuthToken()
+    if token then
+        headers["Authorization"] = "Bearer " .. token
+    end
+
+    GTelemetry.Debug("Sending to: " .. endpoint .. " (" .. #body .. " bytes)")
+
+    HTTP({
+        url = endpoint,
+        method = "POST",
+        headers = headers,
+        body = body,
+        type = "application/json",
+
+        success = function(code, respBody)
+            if code >= 200 and code < 300 then
+                callbacks.onSuccess()
+            else
+                callbacks.onFailure("HTTP " .. code .. ": " .. (respBody or "no body"))
+            end
+        end,
+
+        failed = function(err)
+            callbacks.onFailure(tostring(err))
+        end,
+    })
+end
+
 --- Send the OTLP payload to the configured endpoint.
 -- @param jsonBody string JSON-encoded ExportMetricsServiceRequest
 function GTelemetry.OTLP.Send(jsonBody)
@@ -218,51 +256,25 @@ function GTelemetry.OTLP.Send(jsonBody)
         return
     end
 
-    local headers = {
-        ["Content-Type"] = "application/json",
-    }
-
-    -- Add auth token if configured
-    local token = GTelemetry.Config.GetAuthToken()
-    if token then
-        headers["Authorization"] = "Bearer " .. token
-    end
-
     -- Exponential backoff: skip if still in cooldown window
     if SysTime() < _nextSendTime then
         GTelemetry.Debug("Skipping send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
         return
     end
 
-    GTelemetry.Debug("Sending metrics to: " .. endpoint .. " (" .. #jsonBody .. " bytes)")
-
-    HTTP({
-        url = endpoint,
-        method = "POST",
-        headers = headers,
-        body = jsonBody,
-        type = "application/json",
-
-        success = function(code, body, respHeaders)
-            if code >= 200 and code < 300 then
-                if SysTime() >= _nextSendTime then
-                    _backoffAttempts = 0
-                    _nextSendTime = 0
-                end
-                GTelemetry.Debug("Metrics sent successfully (HTTP " .. code .. ")")
-            else
-                _backoffAttempts = _backoffAttempts + 1
-                _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
-                GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-                GTelemetry.Warn("Alloy returned HTTP " .. code .. ": " .. (body or "no body"))
+    GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
+        onSuccess = function()
+            if SysTime() >= _nextSendTime then
+                _backoffAttempts = 0
+                _nextSendTime = 0
             end
+            GTelemetry.Debug("Metrics sent successfully")
         end,
-
-        failed = function(err)
+        onFailure = function(errMsg)
             _backoffAttempts = _backoffAttempts + 1
             _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-            GTelemetry.Warn("Failed to send metrics: " .. tostring(err))
+            GTelemetry.Warn("Failed to send metrics: " .. errMsg)
             GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
         end,
     })

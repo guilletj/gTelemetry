@@ -25,7 +25,6 @@ local SEVERITY_ERROR = 17
 local AddLog = nil
 local Attribute = nil
 local tostring = tostring
-local table_insert = table.insert
 
 local function safeConcat(t, sep)
     if not t then return "" end
@@ -57,7 +56,7 @@ function GTelemetry.Collectors.BLogs.Init()
     AddLog = function(severity, text, body, attrs)
         GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
     end
-    Attribute = GTelemetry.OTLP.Logs.Attribute
+    Attribute = GTelemetry.OTLP.Attribute
 
     local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
 
@@ -288,7 +287,7 @@ function GTelemetry.Collectors.BLogs.Interceptor.Install()
     AddLog = AddLog or function(severity, text, body, attrs)
         GTelemetry.OTLP.Logs.AddLog(severity, text, body, attrs)
     end
-    Attribute = Attribute or GTelemetry.OTLP.Logs.Attribute
+    Attribute = Attribute or GTelemetry.OTLP.Attribute
 
     local ok, found = pcall(function()
         local testModule = GAS.Logging:MODULE()

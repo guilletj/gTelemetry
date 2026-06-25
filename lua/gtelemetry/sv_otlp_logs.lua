@@ -15,11 +15,9 @@ GTelemetry.OTLP.Logs = GTelemetry.OTLP.Logs or {}
 local util_TableToJSON = util.TableToJSON
 local SysTime = SysTime
 local tostring = tostring
-local string_format = string.format
 local table_insert = table.insert
 local pairs = pairs
 local math_min = math.min
-local math_floor = math.floor
 
 local _logBuffer = {}
 local _bufferSize = 0
@@ -47,29 +45,6 @@ end
 function GTelemetry.OTLP.Logs.Init()
     if _initialized then return end
     _initialized = true
-end
-
-function GTelemetry.OTLP.Logs.Attribute(key, value)
-    local valType = type(value)
-    local otlpValue
-
-    if valType == "number" then
-        if value < math.huge and value > -math.huge then
-            if value == math_floor(value) then
-                otlpValue = {intValue = string_format("%.0f", value)}
-            else
-                otlpValue = {doubleValue = value}
-            end
-        else
-            otlpValue = {stringValue = tostring(value)}
-        end
-    elseif valType == "boolean" then
-        otlpValue = {boolValue = value}
-    else
-        otlpValue = {stringValue = tostring(value)}
-    end
-
-    return {key = key, value = otlpValue}
 end
 
 --- Add a log entry to the buffer.
@@ -114,11 +89,11 @@ function GTelemetry.OTLP.Logs.BuildPayload(logRecords)
             {
                 resource = {
                     attributes = {
-                        GTelemetry.OTLP.Logs.Attribute("service.name", serviceName),
-                        GTelemetry.OTLP.Logs.Attribute("service.version", GTelemetry.Version or "1.5.6"),
-                        GTelemetry.OTLP.Logs.Attribute("host.name", hostname),
-                        GTelemetry.OTLP.Logs.Attribute("gmod.map", currentMap),
-                        GTelemetry.OTLP.Logs.Attribute("gmod.gamemode", _cachedGamemode),
+                        GTelemetry.OTLP.Attribute("service.name", serviceName),
+                        GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.6"),
+                        GTelemetry.OTLP.Attribute("host.name", hostname),
+                        GTelemetry.OTLP.Attribute("gmod.map", currentMap),
+                        GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
                     },
                 },
                 scopeLogs = {
@@ -143,49 +118,24 @@ function GTelemetry.OTLP.Logs.Send(jsonBody)
     local endpoint = GTelemetry.Config.GetLogEndpoint()
     if not endpoint or endpoint == "" then return false end
 
-    local headers = {
-        ["Content-Type"] = "application/json",
-    }
-
-    local token = GTelemetry.Config.GetAuthToken()
-    if token then
-        headers["Authorization"] = "Bearer " .. token
-    end
-
     if SysTime() < _nextSendTime then
         GTelemetry.Debug("Skipping log send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
         return false
     end
 
-    GTelemetry.Debug("Sending logs to: " .. endpoint .. " (" .. #jsonBody .. " bytes)")
-
-    HTTP({
-        url = endpoint,
-        method = "POST",
-        headers = headers,
-        body = jsonBody,
-        type = "application/json",
-
-        success = function(code, body, respHeaders)
-            if code >= 200 and code < 300 then
-                if SysTime() >= _nextSendTime then
-                    _backoffAttempts = 0
-                    _nextSendTime = 0
-                end
-                GTelemetry.Debug("Logs sent successfully (HTTP " .. code .. ")")
-            else
-                _backoffAttempts = _backoffAttempts + 1
-                _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
-                GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
-                GTelemetry.Warn("Log endpoint returned HTTP " .. code .. ": " .. (body or "no body"))
+    GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
+        onSuccess = function()
+            if SysTime() >= _nextSendTime then
+                _backoffAttempts = 0
+                _nextSendTime = 0
             end
+            GTelemetry.Debug("Logs sent successfully")
         end,
-
-        failed = function(err)
+        onFailure = function(errMsg)
             _backoffAttempts = _backoffAttempts + 1
             _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
-            GTelemetry.Warn("Failed to send logs: " .. tostring(err))
+            GTelemetry.Warn("Failed to send logs: " .. errMsg)
         end,
     })
 

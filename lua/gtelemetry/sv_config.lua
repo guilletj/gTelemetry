@@ -71,9 +71,9 @@ GTelemetry.Config.ConVars = {
     ),
 
     entities_interval = CreateConVar(
-        "gtelemetry_entities_interval", "1",
+        "gtelemetry_entities_interval", "5",
         FCVAR_ARCHIVE,
-        "Collect entity metrics every N cycles (1 = every cycle, 2 = every other, etc.). Higher values reduce CPU on large maps.",
+        "Collect entity metrics every N cycles (1 = every cycle, 5 = every fifth, etc.). Higher values reduce CPU on large maps.",
         1, 20
     ),
 
