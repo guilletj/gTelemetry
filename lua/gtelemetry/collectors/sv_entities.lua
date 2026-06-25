@@ -53,7 +53,6 @@ local _noPhysicsPrefix = {
     logic_ = true,
     ai_ = true,
     trigger_ = true,
-    func_ = true,
     item_ = true,
     math_ = true,
     scene_ = true,

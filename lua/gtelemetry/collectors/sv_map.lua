@@ -13,6 +13,7 @@ GTelemetry.Collectors.Map = {}
 
 -- Track map changes
 local _mapChanges = 0
+local _mapChangesAtInit = 0
 local _startTimeNano = nil
 local _initialized = false
 local _mapCountedThisLoad = false
@@ -42,7 +43,7 @@ function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
-    _mapChanges = 0
+    _mapChangesAtInit = _mapChanges
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
@@ -55,6 +56,8 @@ function GTelemetry.Collectors.Map.Undo()
     _initialized = false
     hook.Remove("InitPostEntity", "GTelemetry_MapInit")
     _startTimeNano = nil
+    _mapChangesAtInit = 0
+    _mapCountedThisLoad = false
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
@@ -92,7 +95,7 @@ function GTelemetry.Collectors.Map.Collect()
         "gmod.map.changes",
         "Number of map changes since server process start",
         "{changes}",
-        {MakeCumulativeDataPoint(_mapChanges, _startTimeNano)},
+        {MakeCumulativeDataPoint(_mapChanges - _mapChangesAtInit, _startTimeNano)},
         true
     )
 
