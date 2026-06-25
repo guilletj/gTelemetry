@@ -18,6 +18,7 @@ local _netMessagesSent = 0
 local _netMessagesReceived = 0
 local _netMessagesSentByName = {}
 local _netMessagesReceivedByName = {}
+local _netDetailCount = 0  -- incremental counter for unique message names
 local _startTimeNano = nil
 local _initialized = false
 
@@ -64,6 +65,9 @@ function GTelemetry.Collectors.Network.Init()
     net.Start = function(messageName, unreliable)
         _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)
+        if not _netMessagesSentByName[msgStr] then
+            _netDetailCount = _netDetailCount + 1
+        end
         _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
         return _originalNetStart(messageName, unreliable)
     end
@@ -75,6 +79,9 @@ function GTelemetry.Collectors.Network.Init()
         local msgStr = tostring(messageName)
         return _originalNetReceive(messageName, function(len, ply)
             _netMessagesReceived = _netMessagesReceived + 1
+            if not _netMessagesReceivedByName[msgStr] then
+                _netDetailCount = _netDetailCount + 1
+            end
             _netMessagesReceivedByName[msgStr] = (_netMessagesReceivedByName[msgStr] or 0) + 1
             return callback(len, ply)
         end)
@@ -95,6 +102,7 @@ function GTelemetry.Collectors.Network.Undo()
     _initialized = false
     _originalNetStart = nil
     _originalNetReceive = nil
+    _netDetailCount = 0
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
@@ -130,14 +138,11 @@ function GTelemetry.Collectors.Network.Collect(players)
     )
 
     -- Reset detail name tables when they exceed _maxDetailEntries to prevent unbounded growth.
-    -- We check the first table as proxy (both grow at similar rates).
-    if _netMessagesSentByName and next(_netMessagesSentByName) ~= nil then
-        local count = 0
-        for _ in pairs(_netMessagesSentByName) do count = count + 1 if count > _maxDetailEntries then break end end
-        if count > _maxDetailEntries then
-            _netMessagesSentByName = {}
-            _netMessagesReceivedByName = {}
-        end
+    -- Uses incrementally-updated count to avoid O(n) scan.
+    if _netDetailCount > _maxDetailEntries then
+        _netMessagesSentByName = {}
+        _netMessagesReceivedByName = {}
+        _netDetailCount = 0
     end
 
     -- Net messages sent per name (high cardinality — gated)

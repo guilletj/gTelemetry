@@ -99,8 +99,8 @@ function GTelemetry.Collectors.DarkRP.Collect(players)
 
                 -- Props count (using Cleanup system)
                 if ply.GetCount then
-                    local propCount = ply:GetCount("props") or 0
-                    if propCount > 0 then
+                    local propCount = ply:GetCount("props")
+                    if propCount and propCount > 0 then
                         propsPerPlayer[#propsPerPlayer + 1] = {
                             player = ply,
                             count = propCount,
