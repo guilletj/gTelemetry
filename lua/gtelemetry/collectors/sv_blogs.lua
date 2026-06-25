@@ -25,15 +25,7 @@ local SEVERITY_ERROR = 17
 local AddLog = nil
 local Attribute = nil
 local tostring = tostring
-
-local function safeConcat(t, sep)
-    if not t then return "" end
-    local parts = {}
-    for _, v in ipairs(t) do
-        parts[#parts + 1] = tostring(v)
-    end
-    return table.concat(parts, sep or " ")
-end
+local safeConcat = GTelemetry.Util.safeConcat
 
 function GTelemetry.Collectors.BLogs.IsAvailable()
     return GAS and GAS.Logging and type(GAS.Logging.MODULE) == "function"

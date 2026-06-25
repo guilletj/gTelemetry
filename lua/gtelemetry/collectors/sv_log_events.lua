@@ -21,15 +21,7 @@ local _serverStarted = false
 local tostring = tostring
 local AddLog = nil
 local Attribute = nil
-
-local function safeConcat(t, sep)
-    if not t then return "" end
-    local parts = {}
-    for _, v in ipairs(t) do
-        parts[#parts + 1] = tostring(v)
-    end
-    return table.concat(parts, sep or " ")
-end
+local safeConcat = GTelemetry.Util.safeConcat
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13

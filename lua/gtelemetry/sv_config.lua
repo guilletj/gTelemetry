@@ -15,6 +15,18 @@ local table_insert = table.insert
 local table_concat = table.concat
 local string_match = string.match
 
+-- Shared utilities
+GTelemetry.Util = GTelemetry.Util or {}
+
+function GTelemetry.Util.safeConcat(t, sep)
+    if not t then return "" end
+    local parts = {}
+    for _, v in ipairs(t) do
+        parts[#parts + 1] = tostring(v)
+    end
+    return table_concat(parts, sep or " ")
+end
+
 -- ConVar definitions
 GTelemetry.Config.ConVars = {
     enabled = CreateConVar(

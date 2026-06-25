@@ -18,6 +18,7 @@ local tostring = tostring
 local table_insert = table.insert
 local pairs = pairs
 local math_min = math.min
+local math_ceil = math.ceil
 
 local _logBuffer = {}
 local _bufferSize = 0
@@ -119,7 +120,7 @@ function GTelemetry.OTLP.Logs.Send(jsonBody)
     if not endpoint or endpoint == "" then return false end
 
     if SysTime() < _nextSendTime then
-        GTelemetry.Debug("Skipping log send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
+        GTelemetry.Debug("Skipping log send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
         return false
     end
 

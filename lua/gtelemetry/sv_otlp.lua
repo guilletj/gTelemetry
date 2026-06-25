@@ -21,6 +21,7 @@ local table_insert = table.insert
 local pairs = pairs
 local ipairs = ipairs
 local math_floor = math.floor
+local math_ceil = math.ceil
 
 -- Capture SysTime and os.time at module load to compute accurate Unix time
 -- without drifting into the future: epoch = _epochAtLoad + (SysTime() - _sysTimeStart)
@@ -258,7 +259,7 @@ function GTelemetry.OTLP.Send(jsonBody)
 
     -- Exponential backoff: skip if still in cooldown window
     if SysTime() < _nextSendTime then
-        GTelemetry.Debug("Skipping send (backoff active, next in " .. math.ceil(_nextSendTime - SysTime()) .. "s)")
+        GTelemetry.Debug("Skipping send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
         return
     end
 
