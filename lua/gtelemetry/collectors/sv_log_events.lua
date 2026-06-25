@@ -186,7 +186,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     -- SAM (current hook: SAM.RanCommand)
-    hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args, cmd)
+    hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. argsStr

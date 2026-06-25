@@ -147,7 +147,7 @@ local _hookSpecs = {
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. (args and safeConcat(args) or ""), {Attribute("log.source", "admin"), Attribute("admin.mod", "ulx")})
     end},
-    {event = "SAM.RanCommand", id = "gtelemetry_sam", fn = function(ply, cmd_name, args, cmd)
+    {event = "SAM.RanCommand", id = "gtelemetry_sam", fn = function(ply, cmd_name, args)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},

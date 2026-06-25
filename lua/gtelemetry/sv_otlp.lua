@@ -40,6 +40,7 @@ local _backoffAttempts = 0
 local _nextSendTime = 0
 local _maxBackoff = 30
 local _cachedGamemode = nil
+local _cachedHostname = nil
 
 -- Reset gamemode cache when the gamemode changes
 hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
@@ -175,7 +176,7 @@ end
 -- @param metrics table list of OTLP metric objects from collectors
 -- @return string JSON-encoded payload
 function GTelemetry.OTLP.BuildPayload(metrics)
-    local hostname = GetHostName and GetHostName() or "unknown"
+    if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
     local currentMap = game.GetMap() or "unknown"
     local serviceName = GTelemetry.Config.GetServiceName()
 
@@ -191,7 +192,7 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
                         GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.6"),
-                        GTelemetry.OTLP.Attribute("host.name", hostname),
+                        GTelemetry.OTLP.Attribute("host.name", _cachedHostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
                         GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
                     },
