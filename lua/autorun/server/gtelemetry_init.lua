@@ -119,6 +119,8 @@ hook.Add("InitPostEntity", "GTelemetry_Init", function()
         return
     end
 
+    if timer.Exists("GTelemetry_Collect") then return end
+
     local hibernateCvar = GetConVar("sv_hibernate_think")
     if hibernateCvar and hibernateCvar:GetInt() == 0 then
         GTelemetry.Log("WARNING: sv_hibernate_think is 0 — timers will NOT fire when no players are connected.")
