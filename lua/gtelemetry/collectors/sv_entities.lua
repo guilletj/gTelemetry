@@ -45,6 +45,12 @@ local _typeNames = {
     [ENTITY_EFFECT] = "effect",
 }
 
+local _allTypes = {
+    ENTITY_PROPS, ENTITY_RAGDOLL, ENTITY_NPC, ENTITY_WEAPON,
+    ENTITY_VEHICLE, ENTITY_DOOR, ENTITY_SCRIPTED, ENTITY_CONSTRAINT,
+    ENTITY_EFFECT, ENTITY_OTHER,
+}
+
 -- Class cache: class names never change, so cache classification results.
 -- Normal table is fine (<200 unique classes per map).
 local _classCache = {}
@@ -145,6 +151,10 @@ function GTelemetry.Collectors.Entities.Collect()
 
     local worldTypeCounts = {}
     local playerTypeCounts = {}
+    for _, v in ipairs(_allTypes) do
+        worldTypeCounts[v] = 0
+        playerTypeCounts[v] = 0
+    end
 
     local perPlayer = {} -- [steamID] = { name, types: { [type] = count } }
 

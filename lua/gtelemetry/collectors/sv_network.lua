@@ -214,14 +214,13 @@ function GTelemetry.Collectors.Network.Collect(players)
         end
     end
 
-    if humanCount > 0 then
-        metrics[#metrics + 1] = MakeGauge(
-            "gmod.network.packet_loss_avg",
-            "Average packet loss percentage across all human players",
-            "%",
-            {MakeDataPoint(math_Round(totalLoss / humanCount, 2))}
-        )
-    end
+    local avgLoss = humanCount > 0 and math_Round(totalLoss / humanCount, 2) or 0
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.network.packet_loss_avg",
+        "Average packet loss percentage across all human players",
+        "%",
+        {MakeDataPoint(avgLoss)}
+    )
 
     if #lossPoints > 0 then
         metrics[#metrics + 1] = MakeGauge(
