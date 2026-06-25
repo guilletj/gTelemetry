@@ -10,7 +10,7 @@ When Alloy converts OTLP metrics to Prometheus via `otelcol.exporter.prometheus`
 
 - **Dots** (`.`) become underscores (`_`)
 - **Counters** (Sum + monotonic) get a `_total` suffix
-- **Unit suffixes** are appended for recognized OTLP units (e.g., `_seconds`, `_milliseconds`, `_bytes`, `_hz`, `_percent`)
+- **Unit suffixes** are appended for recognized OTLP units (e.g., `_seconds`, `_milliseconds`, `_bytes`, `_hertz`, `_percent`)
 
 > If `add_metric_suffixes` is enabled (default), the Prometheus name may differ from the OTLP name shown in `docs/metrics_reference.md`. Use the Prometheus name when writing queries.
 
@@ -26,7 +26,7 @@ When Alloy converts OTLP metrics to Prometheus via `otelcol.exporter.prometheus`
 | `gmod.hooks.think_time` | Gauge | `s` | `gmod_hooks_think_time_seconds` |
 | `gmod.chat.messages` | Sum | `{messages}` | `gmod_chat_messages_total` |
 | `gmod.darkrp.money_total` | Gauge | `{currency}` | `gmod_darkrp_money_total` |
-| `gmod.server.tickrate` | Gauge | `Hz` | `gmod_server_tickrate_hz` |
+| `gmod.server.tickrate` | Gauge | `Hz` | `gmod_server_tickrate_hertz` |
 | `gmod.network.packet_loss_avg` | Gauge | `%` | `gmod_network_packet_loss_avg_percent` |
 | `gmod.network.packet_loss` | Gauge | `%` | `gmod_network_packet_loss_percent` |
 | `gmod.telemetry.collection_errors` | Sum | `{errors}` | `gmod_telemetry_collection_errors_total` |
@@ -41,7 +41,7 @@ Apply these in PromQL when the default unit is not convenient for your dashboard
 
 | Source unit | Prometheus suffix | To display as | PromQL transform |
 |-------------|-------------------|---------------|------------------|
-| hertz | `_hz` | (already hz) | — |
+| hertz | `_hertz` | (already hertz) | — |
 | percent | `_percent` | (already percent) | — |
 | seconds | `_seconds` | milliseconds | `<metric> * 1000` |
 | seconds | `_seconds` | minutes | `<metric> / 60` |
@@ -90,7 +90,7 @@ gmod_server_tick_duration
 
 #### Tick Rate
 ```promql
-gmod_server_tickrate_hz
+gmod_server_tickrate_hertz
 ```
 | Property | Value |
 |----------|-------|
