@@ -34,7 +34,6 @@ end
 
 function GTelemetry.Collectors.BLogs.Init()
     if _initialized then return end
-    _initialized = true
 
     if not GTelemetry.Collectors.BLogs.IsAvailable() then
         GTelemetry.Warn("bLogs bridge: GAS.Logging not available")
@@ -45,6 +44,8 @@ function GTelemetry.Collectors.BLogs.Init()
         GTelemetry.Warn("bLogs bridge: GTelemetry.OTLP.Logs not available")
         return
     end
+
+    _initialized = true
 
     AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
@@ -62,6 +63,12 @@ function GTelemetry.Collectors.BLogs.Init()
 
     if mode == "intercept" or mode == "hybrid" then
         GTelemetry.Collectors.BLogs.Interceptor.Install()
+    end
+
+    -- Late-init: emit server start if map already loaded (InitPostEntity already fired)
+    if (mode == "replace" or mode == "hybrid") and game.GetMap() and game.GetMap() ~= "" and not _modulePrevMap then
+        _modulePrevMap = game.GetMap()
+        AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. _modulePrevMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
     end
 
     GTelemetry.Debug("bLogs bridge initialized (mode: " .. mode .. ")")

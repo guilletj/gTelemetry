@@ -25,7 +25,6 @@ local _bufferSize = 0
 local _bufferStart = 1
 local _initialized = false
 
-GTelemetry.OTLP.Logs = GTelemetry.OTLP.Logs or {}
 GTelemetry.OTLP.Logs.SendFailures = 0
 GTelemetry.OTLP.Logs.DroppedLogs = 0
 
@@ -164,20 +163,25 @@ function GTelemetry.OTLP.Logs.Send(jsonBody, recordsToRetry)
         return false
     end
 
+    local flushGen = _logGeneration
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            _backoffAttempts = 0
-            _nextSendTime = 0
-            GTelemetry.Debug("Logs sent successfully")
+            pcall(function()
+                _backoffAttempts = 0
+                _nextSendTime = 0
+                GTelemetry.Debug("Logs sent successfully")
+            end)
         end,
         onFailure = function(errMsg)
-            _backoffAttempts = _backoffAttempts + 1
-            _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
-            GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
-            GTelemetry.Warn("Failed to send logs: " .. errMsg)
-            if timer.Exists("GTelemetry_LogFlush") then
-                _reinsertRecords(recordsToRetry)
-            end
+            pcall(function()
+                _backoffAttempts = _backoffAttempts + 1
+                _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
+                GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
+                GTelemetry.Warn("Failed to send logs: " .. errMsg)
+                if timer.Exists("GTelemetry_LogFlush") and flushGen == _logGeneration then
+                    _reinsertRecords(recordsToRetry)
+                end
+            end)
         end,
     })
 
@@ -193,6 +197,7 @@ function GTelemetry.OTLP.Logs.Flush()
     end
     _isFlushing = true
 
+    _logGeneration = _logGeneration + 1
     local records = {}
     for i = 0, _bufferSize - 1 do
         records[i + 1] = _logBuffer[_bufferStart + i]
@@ -219,6 +224,7 @@ end
 
 --- Clear buffer without sending.
 function GTelemetry.OTLP.Logs.ClearBuffer()
+    _logGeneration = _logGeneration + 1
     _logBuffer = {}
     _bufferStart = 1
     _bufferSize = 0

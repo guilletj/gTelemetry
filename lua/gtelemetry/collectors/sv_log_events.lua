@@ -29,12 +29,13 @@ local SEVERITY_ERROR = 17
 
 function GTelemetry.Collectors.LogEvents.Init()
     if _initialized then return end
-    _initialized = true
 
     if not GTelemetry.OTLP.Logs then
         GTelemetry.Warn("LogEvents collector: GTelemetry.OTLP.Logs not available")
         return
     end
+
+    _initialized = true
 
     AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
@@ -395,6 +396,19 @@ function GTelemetry.Collectors.LogEvents.Init()
             Attribute("log.event", "server_stop"),
         })
     end, 10)
+
+    -- Late-init: emit server start if map already loaded (InitPostEntity already fired)
+    if game.GetMap() and game.GetMap() ~= "" and not _serverStarted then
+        _serverStarted = true
+        _prevMap = game.GetMap()
+        local hostname = GetHostName and GetHostName() or "unknown"
+        local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
+        local body = "Server started — " .. hostname .. ", map: " .. _prevMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
+        AddLog(SEVERITY_INFO, "INFO", body, {
+            Attribute("log.source", "system"),
+            Attribute("log.event", "server_start"),
+        })
+    end
 
     GTelemetry.Debug("LogEvents collector initialized")
 end

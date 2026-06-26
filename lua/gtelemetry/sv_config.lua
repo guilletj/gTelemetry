@@ -308,6 +308,9 @@ cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
     if interval < 1 then
         GTelemetry.Warn("gtelemetry_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
         interval = 1
+    elseif interval > 300 then
+        GTelemetry.Warn("gtelemetry_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
+        interval = 300
     end
 
     if timer.Exists("GTelemetry_Collect") then

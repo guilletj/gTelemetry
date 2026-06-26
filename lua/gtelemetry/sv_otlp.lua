@@ -250,14 +250,21 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
 
         success = function(code, respBody)
             if code >= 200 and code < 300 then
-                if callbacks.onSuccess then callbacks.onSuccess() end
+                if callbacks.onSuccess then
+                    local ok, err = pcall(callbacks.onSuccess)
+                    if not ok then GTelemetry.Warn("HTTP onSuccess callback failed: " .. tostring(err)) end
+                end
             elseif callbacks.onFailure then
-                callbacks.onFailure("HTTP " .. code .. ": " .. (respBody or "no body"))
+                local ok, err = pcall(callbacks.onFailure, "HTTP " .. code .. ": " .. (respBody or "no body"))
+                if not ok then GTelemetry.Warn("HTTP onFailure callback failed: " .. tostring(err)) end
             end
         end,
 
         failed = function(err)
-            if callbacks.onFailure then callbacks.onFailure(tostring(err)) end
+            if callbacks.onFailure then
+                local ok, err2 = pcall(callbacks.onFailure, tostring(err))
+                if not ok then GTelemetry.Warn("HTTP failed callback failed: " .. tostring(err2)) end
+            end
         end,
     })
 end
