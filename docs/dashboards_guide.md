@@ -54,9 +54,94 @@ Apply these in PromQL when the default unit is not convenient for your dashboard
 
 ---
 
-## 3. Panel Presets
+## 3. Multi-Server Label Handling
 
-### 3.1 Server Performance
+When `resource_to_telemetry_conversion = true` is set in Alloy, every OTLP resource attribute becomes a Prometheus label. gTelemetry emits five:
+
+| Label | Origin | Purpose |
+|-------|--------|---------|
+| `service_name` | `gtelemetry_service_name` ConVar | Unique server identifier |
+| `gmod_map` | `game.GetMap()` | Current map |
+| `gmod_gamemode` | `engine.ActiveGamemode()` | Current gamemode |
+| `host_name` | `GetHostName()` | Server hostname |
+| `service_version` | `GTelemetry.Version` | Addon version |
+
+For multi-server setups, **`gmod_map` and `gmod_gamemode` split a single server's time series** — every time a server changes map or gamemode, Prometheus records it as a separate series. This is correct for per-map or per-gamemode analysis, but for most overall dashboards you want **one continuous line per server** across map and gamemode changes.
+
+Both `gmod_map` and `gmod_gamemode` are safe to collapse: a server is in **exactly one map and one gamemode** at any point in time — there are never duplicate data points with different values for the same server at the same timestamp.
+
+### 3.1 Collapsing labels with `without()`
+
+Use `without()` to drop labels you don't need. The remaining labels determine the grouping.
+
+| Goal | PromQL |
+|------|--------|
+| One line per server | `avg(...) without (gmod_map, gmod_gamemode)` |
+| One line per hook type | `sum(...) without (gmod_map, gmod_gamemode)` |
+| One line per entity type | `sum(...) without (gmod_map, gmod_gamemode)` |
+| One line per player | `avg(...) without (gmod_map, gmod_gamemode)` |
+
+### 3.2 Examples
+
+**Server FPS — continuous line:**
+
+```promql
+avg(gmod_server_fps_hertz{service_name="$server"}) without (gmod_map, gmod_gamemode)
+```
+
+**Entities by type (player-owned), collapsed:**
+
+```promql
+sum(gmod_entities_by_type{entity_owner="player"} != 0) without (gmod_map, gmod_gamemode)
+```
+
+**Hook count per hook type:**
+
+```promql
+sum(gmod_hooks_count) without (gmod_map, gmod_gamemode)
+```
+
+**Player client FPS — one line per player:**
+
+```promql
+avg(gmod_players_client_fps) without (gmod_map, gmod_gamemode)
+```
+
+### 3.3 Filtering by server
+
+Use the `service_name` label to select a specific server:
+
+```promql
+avg(gmod_server_fps_hertz{service_name="$server"}) without (gmod_map, gmod_gamemode)
+```
+
+Define a Grafana dashboard variable `$server` with:
+
+```
+label_values(gmod_server_fps_hertz, service_name)
+```
+
+Apply it across all panels for a consistent filter.
+
+### 3.4 Preserving one label, dropping the other
+
+If you need to preserve `gmod_gamemode` (to compare FPS by gamemode, for example):
+
+```promql
+avg(gmod_server_fps_hertz) without (gmod_map)
+```
+
+To preserve `gmod_map` and drop `gmod_gamemode`:
+
+```promql
+avg(gmod_server_fps_hertz) without (gmod_gamemode)
+```
+
+---
+
+## 4. Panel Presets
+
+### 4.1 Server Performance
 
 #### Server FPS
 ```promql
@@ -149,7 +234,7 @@ rate(gmod_telemetry_send_failures_total[5m])
 
 ---
 
-### 3.2 Players
+### 4.2 Players
 
 #### Player Count
 ```promql
@@ -232,7 +317,7 @@ gmod_players_load_time_seconds
 
 ---
 
-### 3.3 Entities
+### 4.3 Entities
 
 #### Total Entities
 ```promql
@@ -287,7 +372,7 @@ gmod_entities_owned_by_player
 
 ---
 
-### 3.4 Network
+### 4.4 Network
 
 #### Net Messages In/Out
 ```promql
@@ -341,7 +426,7 @@ gmod_network_packet_loss_percent
 
 ---
 
-### 3.5 Hooks & Errors
+### 4.5 Hooks & Errors
 
 #### Think / Tick Hook Count
 ```promql
@@ -394,7 +479,7 @@ rate(gmod_lua_errors_total[5m])
 
 ---
 
-### 3.6 Map & Server Info
+### 4.6 Map & Server Info
 
 #### Server Info
 ```promql
@@ -421,7 +506,7 @@ gmod_map_changes_total
 
 ---
 
-### 3.7 Chat & Admin
+### 4.7 Chat & Admin
 
 #### Chat Message Rate
 ```promql
@@ -443,7 +528,7 @@ rate(gmod_admin_commands_total[5m])
 
 ---
 
-### 3.8 DarkRP Economy
+### 4.8 DarkRP Economy
 
 *Only available when DarkRP is detected and `gtelemetry_darkrp` is enabled.*
 
