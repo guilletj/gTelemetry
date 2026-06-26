@@ -21,6 +21,7 @@ local _mapCountedThisLoad = false
 local MakeGauge = nil
 local MakeDataPoint = nil
 local _cachedHostname = nil
+local _cachedIP = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
@@ -82,7 +83,7 @@ function GTelemetry.Collectors.Map.Collect()
     local gm = gmod.GetGamemode()
     local gamemodeName = gm and gm.Name or "unknown"
     if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
-    local currentIP = game.GetIPAddress and game.GetIPAddress() or "unknown"
+    if not _cachedIP then _cachedIP = game.GetIPAddress and game.GetIPAddress() or "unknown" end
 
     -- Server info (always value 1, metadata carried as labels)
     metrics[#metrics + 1] = MakeGauge(
@@ -93,7 +94,7 @@ function GTelemetry.Collectors.Map.Collect()
             Attribute("server.map", currentMap),
             Attribute("server.gamemode", gamemodeName),
             Attribute("server.hostname", _cachedHostname),
-            Attribute("server.ip", currentIP),
+            Attribute("server.ip", _cachedIP),
         })}
     )
 
