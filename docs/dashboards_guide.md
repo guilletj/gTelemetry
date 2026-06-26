@@ -244,14 +244,14 @@ gmod_entities_total
 | Unit | `{entities}` |
 | Description | Total entities in the world. |
 
-#### Player Entities
+#### Player Count
 ```promql
-gmod_entities_players
+gmod_players_count
 ```
 | Property | Value |
 |----------|-------|
 | Visualization | Stat |
-| Unit | `{entities}` |
+| Unit | `{players}` |
 
 #### By Type + Owner (Stacked)
 ```promql

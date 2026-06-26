@@ -218,14 +218,6 @@ function GTelemetry.Collectors.Entities.Collect()
         {MakeDataPoint(totalCount)}
     )
 
-    -- Players (entity count)
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.players",
-        "Number of player entities",
-        "{entities}",
-        {MakeDataPoint(player.GetCount())}
-    )
-
     -- Physics objects
     metrics[#metrics + 1] = MakeGauge(
         "gmod.physics.objects",

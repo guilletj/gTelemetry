@@ -38,7 +38,6 @@ All metrics are prefixed with `gmod.` for easy filtering.
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
 | `gmod.entities.total` | Gauge | — | Total entity count |
-| `gmod.entities.players` | Gauge | — | Player entity count |
 | `gmod.entities.by_type` | Gauge | `entity.type`, `entity.owner` | Entities grouped by type (prop, ragdoll, npc, weapon, vehicle, door, scripted_ent, constraint, effect, other) and owner (world \| player) |
 | `gmod.physics.objects` | Gauge | — | Entities with an active physics object |
 | `gmod.entities.owned_by_player` | Gauge | `player.name`, `player.steam_id`, `entity.type`, `entity.class` | Entities owned per player, grouped by type |
