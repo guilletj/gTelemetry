@@ -42,18 +42,19 @@ local function _reinsertRecords(records)
     local failedCount = #records
     local currentStart = _bufferStart
     local currentSize = _bufferSize
+    local maxSize = GTelemetry.Config.GetLogBufferSize()
+    local toInsert = math.min(failedCount, maxSize - currentSize)
     for i = currentSize, 1, -1 do
-        _logBuffer[currentStart + failedCount + i - 1] = _logBuffer[currentStart + i - 1]
+        _logBuffer[currentStart + toInsert + i - 1] = _logBuffer[currentStart + i - 1]
         _logBuffer[currentStart + i - 1] = nil
     end
-    for i = 1, failedCount do
+    for i = 1, toInsert do
         _logBuffer[currentStart + i - 1] = records[i]
     end
     _bufferStart = currentStart
-    _bufferSize = currentSize + failedCount
-    local maxSize = GTelemetry.Config.GetLogBufferSize()
-    if _bufferSize > maxSize then
-        _bufferSize = maxSize
+    _bufferSize = currentSize + toInsert
+    if toInsert < failedCount then
+        GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + (failedCount - toInsert)
     end
 end
 
