@@ -25,6 +25,7 @@ local _bufferSize = 0
 local _bufferStart = 1
 local _initialized = false
 
+GTelemetry.OTLP.Logs = GTelemetry.OTLP.Logs or {}
 GTelemetry.OTLP.Logs.SendFailures = 0
 GTelemetry.OTLP.Logs.DroppedLogs = 0
 
@@ -35,9 +36,30 @@ local _isFlushing = false
 local _cachedGamemode = nil
 local _cachedHostname = nil
 
+--- Prepend records to buffer, preserving new records added after flush.
+local function _reinsertRecords(records)
+    if not records or #records == 0 then return end
+    local failedCount = #records
+    local currentStart = _bufferStart
+    local currentSize = _bufferSize
+    for i = currentSize, 1, -1 do
+        _logBuffer[currentStart + failedCount + i - 1] = _logBuffer[currentStart + i - 1]
+        _logBuffer[currentStart + i - 1] = nil
+    end
+    for i = 1, failedCount do
+        _logBuffer[currentStart + i - 1] = records[i]
+    end
+    _bufferStart = currentStart
+    _bufferSize = currentSize + failedCount
+end
+
 hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_Logs_GamemodeCache", function()
     _cachedGamemode = nil
 end)
+
+cvars.AddChangeCallback("hostname", function()
+    _cachedHostname = nil
+end, "GTelemetry_Logs_HostnameCache")
 
 function GTelemetry.OTLP.Logs.ResetBackoff()
     _backoffAttempts = 0
@@ -117,7 +139,9 @@ end
 
 --- Send log payload HTTP POST to the configured endpoint.
 --- Returns true if a request was initiated, false if skipped (backoff).
-function GTelemetry.OTLP.Logs.Send(jsonBody)
+--- @param jsonBody string JSON-encoded ExportLogsServiceRequest
+--- @param recordsToRetry table|nil records to re-insert on HTTP failure
+function GTelemetry.OTLP.Logs.Send(jsonBody, recordsToRetry)
     local endpoint = GTelemetry.Config.GetLogEndpoint()
     if not endpoint or endpoint == "" then return false end
 
@@ -128,10 +152,8 @@ function GTelemetry.OTLP.Logs.Send(jsonBody)
 
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            if SysTime() >= _nextSendTime then
-                _backoffAttempts = 0
-                _nextSendTime = 0
-            end
+            _backoffAttempts = 0
+            _nextSendTime = 0
             GTelemetry.Debug("Logs sent successfully")
         end,
         onFailure = function(errMsg)
@@ -139,6 +161,7 @@ function GTelemetry.OTLP.Logs.Send(jsonBody)
             _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
             GTelemetry.Warn("Failed to send logs: " .. errMsg)
+            _reinsertRecords(recordsToRetry)
         end,
     })
 
@@ -164,31 +187,17 @@ function GTelemetry.OTLP.Logs.Flush()
 
     local success, result = pcall(function()
         local jsonBody = GTelemetry.OTLP.Logs.BuildPayload(records)
-        return GTelemetry.OTLP.Logs.Send(jsonBody)
+        return GTelemetry.OTLP.Logs.Send(jsonBody, records)
     end)
 
     if not success then
         GTelemetry.Warn("Log flush failed: " .. tostring(result))
+        _reinsertRecords(records)
     elseif not result then
         GTelemetry.Debug("Log flush skipped (backoff active), re-inserting " .. #records .. " records")
+        _reinsertRecords(records)
     end
 
-    if not success or not result then
-        local failedCount = #records
-        if failedCount > 0 then
-            local currentStart = _bufferStart
-            local currentSize = _bufferSize
-            for i = currentSize, 1, -1 do
-                _logBuffer[currentStart + failedCount + i - 1] = _logBuffer[currentStart + i - 1]
-                _logBuffer[currentStart + i - 1] = nil
-            end
-            for i = 1, failedCount do
-                _logBuffer[currentStart + i - 1] = records[i]
-            end
-            _bufferStart = currentStart
-            _bufferSize = currentSize + failedCount
-        end
-    end
     _isFlushing = false
 end
 

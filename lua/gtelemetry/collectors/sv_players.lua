@@ -43,6 +43,8 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
     local ok, fps = pcall(net.ReadFloat)
     if ok and fps and fps > 0 then
         _playerData[steamID].fps = fps
+    else
+        _playerData[steamID].fps = 0
     end
 end)
 
@@ -108,6 +110,22 @@ function GTelemetry.Collectors.Players.Init()
             loadTime = nil,
         }
     end)
+
+    -- Pre-populate data for players already connected (late init path)
+    local now = SysTime()
+    for _, ply in ipairs(player.GetAll()) do
+        if IsValid(ply) and not ply:IsBot() then
+            local steamID = ply:SteamID()
+            _playerData[steamID] = _playerData[steamID] or {
+                fps = 0,
+                kills = 0,
+                deaths = 0,
+                connectTime = now,
+                loadStart = now,
+                loadTime = nil,
+            }
+        end
+    end
 
 end
 

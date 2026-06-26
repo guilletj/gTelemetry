@@ -350,9 +350,12 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
             GTelemetry.OTLP.Logs.Flush()
         end
-        for _, collector in pairs(GTelemetry.Collectors) do
+        for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Undo then
-                pcall(collector.Undo)
+                local ok, err = pcall(collector.Undo)
+                if not ok then
+                    GTelemetry.Warn("Collector '" .. tostring(name) .. "' Undo failed: " .. tostring(err))
+                end
             end
         end
     end
@@ -411,7 +414,7 @@ cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
     if not valid[newVal] then
         GTelemetry.Warn("Invalid gtelemetry_log_blogs_mode value: " .. tostring(newVal) .. ". Valid: off, replace, intercept, hybrid")
     end
-    GTelemetry.Log("bLogs integration mode changed to: " .. tostring(newVal) .. " — toggle gtelemetry_log_enabled to apply")
+    GTelemetry.Log("bLogs integration mode changed to: " .. tostring(newVal) .. " — toggle gtelemetry_log_enabled to apply (in-flight logs will be flushed)")
 end, "gtelemetry_log_blogs_mode_change")
 
 

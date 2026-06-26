@@ -66,15 +66,9 @@ include("gtelemetry/collectors/sv_darkrp.lua")
 -- bLogs bridge: always include the module definition (it's small)
 include("gtelemetry/collectors/sv_blogs.lua")
 
--- Log events: skip core collector when any bLogs bridge mode is active
--- NOTE: IsBlogsAvailable() at load time might return false if GAS hasn't loaded yet.
--- That's safe — sv_log_events is included as fallback, and StartLogCollection()
--- re-checks at runtime to dispatch to the correct collector.
-if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
-    GTelemetry.Log("bLogs detected — using bLogs bridge for log collection")
-else
-    include("gtelemetry/collectors/sv_log_events.lua")
-end
+-- Log events collector: always included. StartLogCollection() dispatches at runtime
+-- between bLogs bridge and core log events based on gtelemetry_log_blogs_mode.
+include("gtelemetry/collectors/sv_log_events.lua")
 
 --- Start (or restart) the metric collection timer.
 function GTelemetry.StartCollection()
@@ -190,14 +184,21 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
     -- Attempt one final metrics push before shutting down.
     -- NOTE: HTTP() is asynchronous; the server may close before the
     -- request completes, causing the final payload to be lost.
+    -- Wrap in pcall in case engine state is partially torn down.
     if GTelemetry.Config.IsEnabled() then
         GTelemetry.Debug("Server shutting down, sending final metrics...")
-        GTelemetry.OTLP.CollectAndSend()
+        local ok, err = pcall(GTelemetry.OTLP.CollectAndSend)
+        if not ok then
+            GTelemetry.Warn("Final metrics send failed: " .. tostring(err))
+        end
     end
 
     if GTelemetry.Config.IsLogEnabled() and GTelemetry.OTLP.Logs then
         GTelemetry.Debug("Server shutting down, flushing logs...")
-        GTelemetry.OTLP.Logs.Flush()
+        local ok, err = pcall(GTelemetry.OTLP.Logs.Flush)
+        if not ok then
+            GTelemetry.Warn("Final log flush failed: " .. tostring(err))
+        end
     end
 end)
 

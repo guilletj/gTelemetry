@@ -235,22 +235,27 @@ local function _shutdownHook()
 end
 
 local function _setupModule()
-    _module = GAS.Logging:MODULE()
-    _module.Category = "gTelemetry"
-    _module.Name = "Loki Export"
-    _module.Colour = Color(0, 255, 200)
+    local ok, err = pcall(function()
+        _module = GAS.Logging:MODULE()
+        _module.Category = "gTelemetry"
+        _module.Name = "Loki Export"
+        _module.Colour = Color(0, 255, 200)
 
-    _module:Setup(function()
-        for _, spec in ipairs(_hookSpecs) do
-            _module:Hook(spec.event, spec.id, spec.fn)
-        end
+        _module:Setup(function()
+            for _, spec in ipairs(_hookSpecs) do
+                _module:Hook(spec.event, spec.id, spec.fn)
+            end
+        end)
+
+        -- Register ShutDown directly with priority 10 so it runs BEFORE the main flush (priority 0)
+        hook.Add("ShutDown", "GTelemetry_BLogsShutdown", _shutdownHook, 10)
+
+        GAS.Logging:AddModule(_module)
+        GTelemetry.Debug("bLogs bridge registered " .. #_hookSpecs .. " hooks via MODULE:Hook()")
     end)
-
-    -- Register ShutDown directly with priority 10 so it runs BEFORE the main flush (priority 0)
-    hook.Add("ShutDown", "GTelemetry_BLogsShutdown", _shutdownHook, 10)
-
-    GAS.Logging:AddModule(_module)
-    GTelemetry.Debug("bLogs bridge registered " .. #_hookSpecs .. " hooks via MODULE:Hook()")
+    if not ok then
+        GTelemetry.Warn("bLogs bridge: failed to setup GAS module: " .. tostring(err))
+    end
 end
 
 local function _cleanupModule()

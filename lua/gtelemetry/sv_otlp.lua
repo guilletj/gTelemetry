@@ -47,6 +47,11 @@ hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
     _cachedGamemode = nil
 end)
 
+-- Reset hostname cache when hostname changes at runtime
+cvars.AddChangeCallback("hostname", function()
+    _cachedHostname = nil
+end, "GTelemetry_HostnameCache")
+
 -- Reset backoff (called when endpoint ConVar changes)
 function GTelemetry.OTLP.ResetBackoff()
     _backoffAttempts = 0
@@ -273,10 +278,8 @@ function GTelemetry.OTLP.Send(jsonBody)
 
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            if SysTime() >= _nextSendTime then
-                _backoffAttempts = 0
-                _nextSendTime = 0
-            end
+            _backoffAttempts = 0
+            _nextSendTime = 0
             GTelemetry.Debug("Metrics sent successfully")
         end,
         onFailure = function(errMsg)
@@ -297,6 +300,7 @@ function GTelemetry.OTLP.CollectAndSend()
     if not GTelemetry.Config.IsEnabled() then return end
     if _isCollecting then
         GTelemetry.Debug("Skipping collection — previous cycle still in progress")
+        GTelemetry.LastCollectionDuration = nil
         return
     end
     _isCollecting = true
@@ -313,7 +317,7 @@ function GTelemetry.OTLP.CollectAndSend()
 
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
-                local ok2, result = pcall(collector.Collect, players)
+                local ok2, result = pcall(function() return collector:Collect(players) end)
                 if ok2 and type(result) == "table" then
                     local count = #result
                     GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
