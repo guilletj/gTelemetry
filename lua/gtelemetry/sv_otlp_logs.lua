@@ -51,6 +51,10 @@ local function _reinsertRecords(records)
     end
     _bufferStart = currentStart
     _bufferSize = currentSize + failedCount
+    local maxSize = GTelemetry.Config.GetLogBufferSize()
+    if _bufferSize > maxSize then
+        _bufferSize = maxSize
+    end
 end
 
 hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_Logs_GamemodeCache", function()
@@ -92,6 +96,15 @@ function GTelemetry.OTLP.Logs.AddLog(severityNumber, severityText, body, attribu
         _bufferStart = _bufferStart + 1
         GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + 1
         _bufferSize = _bufferSize - 1
+    end
+
+    if _bufferStart > maxSize * 2 then
+        local newBuf = {}
+        for i = 1, _bufferSize do
+            newBuf[i] = _logBuffer[_bufferStart + i - 1]
+        end
+        _logBuffer = newBuf
+        _bufferStart = 1
     end
 
     _logBuffer[_bufferStart + _bufferSize] = record

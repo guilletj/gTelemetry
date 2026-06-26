@@ -270,6 +270,7 @@ local function _cleanupModule()
     hook.Remove("ShutDown", "GTelemetry_BLogsShutdown")
     pcall(function() GAS.Logging:RemoveModule(_module) end)
     _module = nil
+    _modulePrevMap = nil
     GTelemetry.Debug("bLogs bridge hooks removed")
 end
 

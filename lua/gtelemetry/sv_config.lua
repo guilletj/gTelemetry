@@ -159,6 +159,7 @@ function GTelemetry.Config.GetEndpoint()
         GTelemetry.Warn("No endpoint configured. Set gtelemetry_endpoint ConVar.")
     elseif not string_match(url, "^https?://") then
         GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
+        url = ""
     end
     return url
 end
@@ -227,6 +228,7 @@ function GTelemetry.Config.GetLogEndpoint()
         GTelemetry.Warn("No log endpoint configured. Set gtelemetry_log_endpoint ConVar.")
     elseif not string_match(url, "^https?://") then
         GTelemetry.Warn("Invalid log endpoint URL (must start with http:// or https://): " .. url)
+        url = ""
     end
     return url
 end

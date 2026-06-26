@@ -250,14 +250,14 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
 
         success = function(code, respBody)
             if code >= 200 and code < 300 then
-                callbacks.onSuccess()
-            else
+                if callbacks.onSuccess then callbacks.onSuccess() end
+            elseif callbacks.onFailure then
                 callbacks.onFailure("HTTP " .. code .. ": " .. (respBody or "no body"))
             end
         end,
 
         failed = function(err)
-            callbacks.onFailure(tostring(err))
+            if callbacks.onFailure then callbacks.onFailure(tostring(err)) end
         end,
     })
 end
