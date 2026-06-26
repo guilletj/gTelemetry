@@ -158,6 +158,12 @@ end)
 if game.GetMap() and game.GetMap() ~= "" then
     timer.Simple(1, function()
         if not timer.Exists("GTelemetry_Collect") and GTelemetry.Config.IsEnabled() then
+            local hibernateCvar = GetConVar("sv_hibernate_think")
+            if hibernateCvar and hibernateCvar:GetInt() == 0 then
+                GTelemetry.Log("WARNING: sv_hibernate_think is 0 — timers will NOT fire when no players are connected.")
+                GTelemetry.Log("Set sv_hibernate_think 1 in server.cfg or add +sv_hibernate_think 1 to your launch args.")
+            end
+
             GTelemetry.StartCollection()
 
             if GTelemetry.Config.IsLogEnabled() and not timer.Exists("GTelemetry_LogFlush") then

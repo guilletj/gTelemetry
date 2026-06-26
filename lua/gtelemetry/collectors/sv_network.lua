@@ -193,7 +193,7 @@ function GTelemetry.Collectors.Network.Collect(players)
     local lossPoints = {}
     for _, ply in ipairs(players) do
         if IsValid(ply) and not ply:IsBot() then
-            local loss = ply.PacketLoss and ply:PacketLoss() or 0
+            local loss = (ply.PacketLoss and ply:PacketLoss() or 0) * 100
             totalLoss = totalLoss + loss
             humanCount = humanCount + 1
             if loss > 0 then

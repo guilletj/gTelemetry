@@ -214,10 +214,14 @@ function GTelemetry.OTLP.Logs.Flush()
 
     if not success then
         GTelemetry.Warn("Log flush failed: " .. tostring(result))
-        _reinsertRecords(records)
+        if timer.Exists("GTelemetry_LogFlush") then
+            _reinsertRecords(records)
+        end
     elseif not result then
         GTelemetry.Debug("Log flush skipped (backoff active), re-inserting " .. #records .. " records")
-        _reinsertRecords(records)
+        if timer.Exists("GTelemetry_LogFlush") then
+            _reinsertRecords(records)
+        end
     end
 
     _isFlushing = false
