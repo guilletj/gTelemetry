@@ -41,7 +41,7 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
     local ok, fps = pcall(net.ReadFloat)
-    if ok and fps and fps > 0 then
+    if ok and fps and fps > 0 and fps < 10000 then
         _playerData[steamID].fps = fps
     else
         _playerData[steamID].fps = 0

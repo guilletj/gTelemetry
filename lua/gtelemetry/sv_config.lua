@@ -429,4 +429,25 @@ cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
     GTelemetry.Log("bLogs integration mode changed to: " .. tostring(newVal) .. " — toggle gtelemetry_log_enabled to apply (in-flight logs will be flushed)")
 end, "gtelemetry_log_blogs_mode_change")
 
+-- Listen for log interval changes to recreate the timer
+cvars.AddChangeCallback("gtelemetry_log_interval", function(_, _, newVal)
+    local interval = tonumber(newVal)
+    if not interval then
+        GTelemetry.Warn("gtelemetry_log_interval must be a number, got '" .. tostring(newVal) .. "', defaulting to 10")
+        interval = 10
+    end
+    if interval < 1 then
+        GTelemetry.Warn("gtelemetry_log_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
+        interval = 1
+    elseif interval > 300 then
+        GTelemetry.Warn("gtelemetry_log_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
+        interval = 300
+    end
+
+    if timer.Exists("GTelemetry_LogFlush") then
+        timer.Adjust("GTelemetry_LogFlush", interval)
+        GTelemetry.Log("Log flush interval changed to " .. interval .. "s")
+    end
+end, "gtelemetry_log_interval_change")
+
 
