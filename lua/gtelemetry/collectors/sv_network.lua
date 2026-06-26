@@ -133,6 +133,7 @@ function GTelemetry.Collectors.Network.Collect(players)
         _netMessagesSentByName = {}
         _netMessagesReceivedByName = {}
         _netDetailCount = 0
+        _startTimeNano = GTelemetry.OTLP.GetTimeNano()
     end
 
     -- Net messages sent per name (high cardinality — gated)

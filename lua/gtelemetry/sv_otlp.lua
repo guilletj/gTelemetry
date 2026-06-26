@@ -239,7 +239,9 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
         headers["Authorization"] = "Bearer " .. token
     end
 
-    GTelemetry.Debug("Sending to: " .. endpoint .. " (" .. #body .. " bytes)")
+    if GTelemetry.Config.IsDebug() then
+        GTelemetry.Debug("Sending to: " .. endpoint .. " (" .. #body .. " bytes)")
+    end
 
     HTTP({
         url = endpoint,
@@ -279,7 +281,9 @@ function GTelemetry.OTLP.Send(jsonBody)
 
     -- Exponential backoff: skip if still in cooldown window
     if SysTime() < _nextSendTime then
-        GTelemetry.Debug("Skipping send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
+        if GTelemetry.Config.IsDebug() then
+            GTelemetry.Debug("Skipping send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
+        end
         return
     end
 
@@ -331,7 +335,9 @@ function GTelemetry.OTLP.CollectAndSend()
                 local ok2, result = pcall(function() return collector.Collect(players) end)
                 if ok2 and type(result) == "table" then
                     local count = #result
-                    GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
+                    if GTelemetry.Config.IsDebug() then
+                        GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
+                    end
                     for _, metric in ipairs(result) do
                         table_insert(allMetrics, metric)
                     end
@@ -340,18 +346,24 @@ function GTelemetry.OTLP.CollectAndSend()
                     GTelemetry.OTLP.CollectionErrors = GTelemetry.OTLP.CollectionErrors + 1
                     GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(result))
                 else
-                    GTelemetry.Debug("Collector '" .. name .. "' returned nil (skipped)")
+                    if GTelemetry.Config.IsDebug() then
+                        GTelemetry.Debug("Collector '" .. name .. "' returned nil (skipped)")
+                    end
                 end
             end
         end
 
         if #allMetrics == 0 then
-            GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            if GTelemetry.Config.IsDebug() then
+                GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            end
             GTelemetry.LastCollectionDuration = 0
             return
         end
 
-        GTelemetry.Debug("Collected " .. #allMetrics .. " metrics from " .. collectorCount .. " collectors")
+        if GTelemetry.Config.IsDebug() then
+            GTelemetry.Debug("Collected " .. #allMetrics .. " metrics from " .. collectorCount .. " collectors")
+        end
 
         local jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
         GTelemetry.OTLP.Send(jsonBody)
