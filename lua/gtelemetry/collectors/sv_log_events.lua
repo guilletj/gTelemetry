@@ -18,6 +18,7 @@ GTelemetry.Collectors.LogEvents = {}
 local _initialized = false
 local _prevMap = nil
 local _serverStarted = false
+local _serverStartLogged = false
 local tostring = tostring
 local AddLog = nil
 local Attribute = nil
@@ -361,7 +362,8 @@ function GTelemetry.Collectors.LogEvents.Init()
     hook.Add("InitPostEntity", "GTelemetry_LogMap", function()
         local currentMap = game.GetMap() or "unknown"
 
-        if not _serverStarted then
+        if not _serverStartLogged then
+            _serverStartLogged = true
             _serverStarted = true
             _prevMap = currentMap
             local hostname = GetHostName and GetHostName() or "unknown"
@@ -398,7 +400,8 @@ function GTelemetry.Collectors.LogEvents.Init()
     end, 10)
 
     -- Late-init: emit server start if map already loaded (InitPostEntity already fired)
-    if game.GetMap() and game.GetMap() ~= "" and not _serverStarted then
+    if game.GetMap() and game.GetMap() ~= "" and not _serverStartLogged then
+        _serverStartLogged = true
         _serverStarted = true
         _prevMap = game.GetMap()
         local hostname = GetHostName and GetHostName() or "unknown"
@@ -448,8 +451,6 @@ function GTelemetry.Collectors.LogEvents.Undo()
     hook.Remove("gamemode.PostGamemodeLoaded", "GTelemetry_LogGamemode")
     hook.Remove("ShutDown", "GTelemetry_LogShutdown")
 
-    _prevMap = nil
-    _serverStarted = false
     GTelemetry.OTLP.Logs.ClearBuffer()
     GTelemetry.Debug("LogEvents collector stopped")
 end

@@ -129,6 +129,7 @@ function GTelemetry.Collectors.Entities.Undo()
     MakeDataPoint = nil
     Attribute = nil
     _cycleCount = 0
+    _classCache = {}
 end
 
 --- Collect entity count metrics.

@@ -24,6 +24,7 @@ local _logBuffer = {}
 local _bufferSize = 0
 local _bufferStart = 1
 local _initialized = false
+local _logGeneration = 0
 
 GTelemetry.OTLP.Logs.SendFailures = 0
 GTelemetry.OTLP.Logs.DroppedLogs = 0

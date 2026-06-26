@@ -17,6 +17,7 @@ GTelemetry.Collectors.BLogs = {}
 local _initialized = false
 local _module = nil
 local _modulePrevMap = nil
+local _serverStartLogged = false
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
@@ -66,7 +67,8 @@ function GTelemetry.Collectors.BLogs.Init()
     end
 
     -- Late-init: emit server start if map already loaded (InitPostEntity already fired)
-    if (mode == "replace" or mode == "hybrid") and game.GetMap() and game.GetMap() ~= "" and not _modulePrevMap then
+    if (mode == "replace" or mode == "hybrid") and game.GetMap() and game.GetMap() ~= "" and not _serverStartLogged then
+        _serverStartLogged = true
         _modulePrevMap = game.GetMap()
         AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. _modulePrevMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
     end
@@ -225,7 +227,8 @@ local _hookSpecs = {
     end},
     {event = "InitPostEntity", id = "GTelemetry_BLogs_map", fn = function()
         local currentMap = game.GetMap() or "unknown"
-        if not _modulePrevMap then
+        if not _serverStartLogged then
+            _serverStartLogged = true
             _modulePrevMap = currentMap
             AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. currentMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
         elseif _modulePrevMap ~= currentMap then
@@ -277,7 +280,6 @@ local function _cleanupModule()
     hook.Remove("ShutDown", "GTelemetry_BLogsShutdown")
     pcall(function() GAS.Logging:RemoveModule(_module) end)
     _module = nil
-    _modulePrevMap = nil
     GTelemetry.Debug("bLogs bridge hooks removed")
 end
 
