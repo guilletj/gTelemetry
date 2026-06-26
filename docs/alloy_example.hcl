@@ -30,6 +30,13 @@ otelcol.processor.batch "default" {
 }
 
 otelcol.exporter.prometheus "default" {
+    // Convert OTLP resource attributes (host.name, gmod.map, gmod.gamemode,
+    // service.name, service.version) to Prometheus labels.
+    // REQUIRED when multiple servers send to the same Alloy — without it every
+    // server produces the same label-less time series, causing data collisions.
+    // Safe for single-server setups too (low-cardinality attributes only).
+    resource_to_telemetry_conversion = true
+
     // Propagate OTLP metric descriptions as Prometheus HELP strings.
     // Requires a backend that supports metadata in remote write (Mimir, Prometheus 3.x+).
     // Without this, descriptions are dropped — visible in Grafana's metric browser only when set.
