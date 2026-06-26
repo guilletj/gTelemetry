@@ -90,7 +90,9 @@ function GTelemetry.StartLogCollection()
     if not GTelemetry.Config.IsLogEnabled() then return end
 
     if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
-        GTelemetry.Collectors.BLogs.Init()
+        if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Init then
+            GTelemetry.Collectors.BLogs.Init()
+        end
         GTelemetry._activeLogCollector = "blogs"
     else
         GTelemetry.Collectors.LogEvents.Init()
@@ -99,6 +101,11 @@ function GTelemetry.StartLogCollection()
 
     if not GTelemetry.OTLP.Logs then
         GTelemetry.Warn("GTelemetry.OTLP.Logs not available — log flush timer not created")
+        return
+    end
+
+    if timer.Exists("GTelemetry_LogFlush") then
+        GTelemetry.Debug("Log flush timer already active")
         return
     end
 

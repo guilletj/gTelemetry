@@ -161,7 +161,9 @@ function GTelemetry.OTLP.Logs.Send(jsonBody, recordsToRetry)
             _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
             GTelemetry.Warn("Failed to send logs: " .. errMsg)
-            _reinsertRecords(recordsToRetry)
+            if timer.Exists("GTelemetry_LogFlush") then
+                _reinsertRecords(recordsToRetry)
+            end
         end,
     })
 

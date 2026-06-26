@@ -51,6 +51,11 @@ function GTelemetry.Collectors.BLogs.Init()
 
     local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
 
+    local validModes = {off = true, replace = true, intercept = true, hybrid = true}
+    if not validModes[mode] then
+        GTelemetry.Warn("Unknown gtelemetry_log_blogs_mode '" .. tostring(mode) .. "', treating as 'off'")
+    end
+
     if mode == "replace" or mode == "hybrid" then
         _setupModule()
     end
@@ -291,17 +296,17 @@ function GTelemetry.Collectors.BLogs.Interceptor.Install()
         local target = mt
         local key
 
-        if type(mt.LogPhrase) == "function" then
+        if type(rawget(mt, "LogPhrase")) == "function" then
             target = mt
             key = "LogPhrase"
-        elseif type(mt.__index) == "table" and type(mt.__index.LogPhrase) == "function" then
-            target = mt.__index
+        elseif type(rawget(mt, "__index")) == "table" and type(rawget(rawget(mt, "__index"), "LogPhrase")) == "function" then
+            target = rawget(mt, "__index")
             key = "LogPhrase"
-        elseif type(mt.Phrase) == "function" then
+        elseif type(rawget(mt, "Phrase")) == "function" then
             target = mt
             key = "Phrase"
-        elseif type(mt.__index) == "table" and type(mt.__index.Phrase) == "function" then
-            target = mt.__index
+        elseif type(rawget(mt, "__index")) == "table" and type(rawget(rawget(mt, "__index"), "Phrase")) == "function" then
+            target = rawget(mt, "__index")
             key = "Phrase"
         else
             return false

@@ -26,6 +26,11 @@ local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
 
+-- Invalidate hostname cache when hostname changes at runtime
+cvars.AddChangeCallback("hostname", function()
+    _cachedHostname = nil
+end, "GTelemetry_Map_HostnameCache")
+
 --- Manually increment the map change counter.
 -- Used by the late-init path when InitPostEntity has already fired.
 function GTelemetry.Collectors.Map.CountChange()
@@ -39,7 +44,6 @@ function GTelemetry.Collectors.Map.Init()
     if _initialized then return end
     _initialized = true
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
-    _mapChangesAtInit = _mapChanges
     MakeGauge = GTelemetry.OTLP.MakeGauge
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
@@ -51,6 +55,7 @@ function GTelemetry.Collectors.Map.Init()
     end)
 
     GTelemetry.Collectors.Map.CountChange()
+    _mapChangesAtInit = _mapChanges
 end
 
 function GTelemetry.Collectors.Map.Undo()

@@ -62,6 +62,12 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     end
 end)
 
+-- Clean up player data on disconnect (module level — persists across enable/disable)
+hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
+    if not IsValid(ply) then return end
+    _playerData[ply:SteamID()] = nil
+end)
+
 --- Initialize references and hooks.
 function GTelemetry.Collectors.Players.Init()
     if _initialized then return end
@@ -89,12 +95,6 @@ function GTelemetry.Collectors.Players.Init()
                 _playerData[aid].kills = _playerData[aid].kills + 1
             end
         end
-    end)
-
-    -- Clean up player data on disconnect
-    hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
-        if not IsValid(ply) then return end
-        _playerData[ply:SteamID()] = nil
     end)
 
     -- Track player connections (skip bots — they don't send client data)
@@ -136,7 +136,6 @@ function GTelemetry.Collectors.Players.Undo()
 
     hook.Remove("PlayerDeath", "GTelemetry_PlayerDeath")
     hook.Remove("PlayerInitialSpawn", "GTelemetry_PlayerConnect")
-    hook.Remove("PlayerDisconnected", "GTelemetry_PlayerDisconnect")
 
     _playerData = {}
     _startTimeNano = nil
@@ -208,7 +207,7 @@ function GTelemetry.Collectors.Players.Collect(players)
                     -- Load time (reported once, after first spawn)
                     -- -1 sentinel means client never sent ready signal within timeout
                     if data.loadTime ~= nil then
-                        if data.loadTime ~= 0 then
+                        if data.loadTime > 0 then
                             loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
                         end
                     elseif curTime - data.connectTime > _clientLoadTimeout then

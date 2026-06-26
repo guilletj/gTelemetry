@@ -278,16 +278,20 @@ function GTelemetry.OTLP.Send(jsonBody)
 
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            _backoffAttempts = 0
-            _nextSendTime = 0
-            GTelemetry.Debug("Metrics sent successfully")
+            pcall(function()
+                _backoffAttempts = 0
+                _nextSendTime = 0
+                GTelemetry.Debug("Metrics sent successfully")
+            end)
         end,
         onFailure = function(errMsg)
-            _backoffAttempts = _backoffAttempts + 1
-            _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
-            GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-            GTelemetry.Warn("Failed to send metrics: " .. errMsg)
-            GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
+            pcall(function()
+                _backoffAttempts = _backoffAttempts + 1
+                _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
+                GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
+                GTelemetry.Warn("Failed to send metrics: " .. errMsg)
+                GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
+            end)
         end,
     })
 end
@@ -317,7 +321,7 @@ function GTelemetry.OTLP.CollectAndSend()
 
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
-                local ok2, result = pcall(function() return collector:Collect(players) end)
+                local ok2, result = pcall(function() return collector.Collect(collector, players) end)
                 if ok2 and type(result) == "table" then
                     local count = #result
                     GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
@@ -336,6 +340,7 @@ function GTelemetry.OTLP.CollectAndSend()
 
         if #allMetrics == 0 then
             GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            GTelemetry.LastCollectionDuration = 0
             return
         end
 

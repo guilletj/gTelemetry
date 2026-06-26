@@ -303,7 +303,10 @@ end
 -- Listen for interval changes to recreate the timer
 cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
     local interval = tonumber(newVal) or 10
-    if interval < 1 then interval = 1 end
+    if interval < 1 then
+        GTelemetry.Warn("gtelemetry_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
+        interval = 1
+    end
 
     if timer.Exists("GTelemetry_Collect") then
         timer.Adjust("GTelemetry_Collect", interval)
