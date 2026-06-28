@@ -17,7 +17,7 @@
 
 -- Initialize global namespace
 GTelemetry = GTelemetry or {}
-GTelemetry.Version = "1.5.7"
+GTelemetry.Version = "1.5.8"
 GTelemetry.Collectors = GTelemetry.Collectors or {}
 
 -- Client files in autorun/client are automatically sent to the client

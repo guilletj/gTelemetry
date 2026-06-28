@@ -98,7 +98,7 @@ GTelemetry.Config.ConVars = {
     ),
 
     version = CreateConVar(
-        "gtelemetry_version", GTelemetry.Version or "1.5.7",
+        "gtelemetry_version", GTelemetry.Version or "1.5.8",
         FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
         "Version of gTelemetry currently running."
     ),
