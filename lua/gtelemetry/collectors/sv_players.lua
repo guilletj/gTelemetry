@@ -13,6 +13,7 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.Players = {}
 
 local ipairs = ipairs
+local SysTime = SysTime
 
 -- Per-player state tracking
 local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadStart, loadTime }
@@ -32,24 +33,18 @@ util.AddNetworkString("GTelemetry_ClientData")
 util.AddNetworkString("GTelemetry_ClientReady")
 util.AddNetworkString("GTelemetry_RequestReady")
 
--- Clean up player data on disconnect (always active — net.Receive handlers
--- are also permanent, so this prevents _playerData from leaking entries
--- when telemetry is toggled off and on).
-hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
-    if not IsValid(ply) then return end
-    _playerData[ply:SteamID()] = nil
-end)
-
 net.Receive("GTelemetry_ClientData", function(len, ply)
     if not IsValid(ply) then return end
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
     local ok, fps = pcall(net.ReadFloat)
-    if ok and fps and fps > 0 then
+    if ok and fps and fps > 0 and fps < 10000 then
         _playerData[steamID].fps = fps
+    else
+        _playerData[steamID].fps = 0
     end
 end)
 
@@ -59,12 +54,18 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = CurTime(), loadStart = SysTime(), loadTime = nil}
+        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
     local data = _playerData[steamID]
     if not data.loadTime or data.loadTime == -1 then
         data.loadTime = math_Round(SysTime() - data.loadStart, 2)
     end
+end)
+
+-- Clean up player data on disconnect (module level — persists across enable/disable)
+hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
+    if not IsValid(ply) then return end
+    _playerData[ply:SteamID()] = nil
 end)
 
 --- Initialize references and hooks.
@@ -104,11 +105,27 @@ function GTelemetry.Collectors.Players.Init()
             fps = 0,
             kills = 0,
             deaths = 0,
-            connectTime = CurTime(),
+            connectTime = SysTime(),
             loadStart = SysTime(),
             loadTime = nil,
         }
     end)
+
+    -- Pre-populate data for players already connected (late init path)
+    local now = SysTime()
+    for _, ply in ipairs(player.GetAll()) do
+        if IsValid(ply) and not ply:IsBot() then
+            local steamID = ply:SteamID()
+            _playerData[steamID] = _playerData[steamID] or {
+                fps = 0,
+                kills = 0,
+                deaths = 0,
+                connectTime = now,
+                loadStart = now,
+                loadTime = nil,
+            }
+        end
+    end
 
 end
 
@@ -149,7 +166,7 @@ function GTelemetry.Collectors.Players.Collect(players)
     local connectionPoints = {}
     local loadTimePoints = {}
 
-    local curTime = CurTime()
+    local curTime = SysTime()
 
     for _, ply in ipairs(players) do
         if IsValid(ply) then
@@ -189,13 +206,15 @@ function GTelemetry.Collectors.Players.Collect(players)
 
                     -- Load time (reported once, after first spawn)
                     -- -1 sentinel means client never sent ready signal within timeout
-                    if data.loadTime then
-                        if data.loadTime ~= 0 then
+                    if data.loadTime ~= nil then
+                        if data.loadTime > 0 then
                             loadTimePoints[#loadTimePoints + 1] = MakeDataPoint(data.loadTime, attrs)
                         end
                     elseif curTime - data.connectTime > _clientLoadTimeout then
-                        data.loadTime = -1
-                        GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
+                        if data.loadTime ~= -1 then
+                            data.loadTime = -1
+                            GTelemetry.Debug("Player '" .. playerName .. "' (" .. steamID .. ") did not send ClientReady within " .. _clientLoadTimeout .. "s")
+                        end
                     end
                 end
             end
@@ -230,14 +249,13 @@ function GTelemetry.Collectors.Players.Collect(players)
 
     -- Average ping
     local humanCount = playerCount - botCount
-    if humanCount > 0 then
-        metrics[#metrics + 1] = MakeGauge(
-            "gmod.players.ping_avg",
-            "Average ping across all human players",
-            "ms",
-            {MakeDataPoint(math_Round(totalPing / humanCount, 1))}
-        )
-    end
+    local avgPing = humanCount > 0 and math_Round(totalPing / humanCount, 1) or 0
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.players.ping_avg",
+        "Average ping across all human players",
+        "ms",
+        {MakeDataPoint(avgPing)}
+    )
 
     -- Client FPS
     if #fpsPoints > 0 then

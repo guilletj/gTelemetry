@@ -47,6 +47,11 @@ hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
     _cachedGamemode = nil
 end)
 
+-- Reset hostname cache when hostname changes at runtime
+cvars.AddChangeCallback("hostname", function()
+    _cachedHostname = nil
+end, "GTelemetry_HostnameCache")
+
 -- Reset backoff (called when endpoint ConVar changes)
 function GTelemetry.OTLP.ResetBackoff()
     _backoffAttempts = 0
@@ -64,7 +69,9 @@ local _isCollecting = false
 function GTelemetry.OTLP.GetTimeNano()
     local now = SysTime()
     local epochSeconds = _epochAtLoad + (now - _sysTimeStart)
-    return string_format("%.0f", epochSeconds * 1e9)
+    local intPart = math_floor(epochSeconds)
+    local nanoPart = math_floor((epochSeconds - intPart) * 1e9)
+    return string_format("%d%09d", intPart, nanoPart)
 end
 
 --- Create an OTLP attribute object.
@@ -72,13 +79,17 @@ end
 -- @param value any attribute value
 -- @return table OTLP attribute
 function GTelemetry.OTLP.Attribute(key, value)
+    if value == nil then
+        return {key = key, value = {stringValue = ""}}
+    end
+
     local valType = type(value)
-    local otlpValue
+    local otlpValue = nil
 
     if valType == "number" then
         -- Check if finite, then if integer or float
         if value < math.huge and value > -math.huge then
-            if value == math_floor(value) then
+            if value == math_floor(value) and value < 1e15 and value > -1e15 then
                 otlpValue = {intValue = string_format("%.0f", value)}
             else
                 otlpValue = {doubleValue = value}
@@ -228,7 +239,9 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
         headers["Authorization"] = "Bearer " .. token
     end
 
-    GTelemetry.Debug("Sending to: " .. endpoint .. " (" .. #body .. " bytes)")
+    if GTelemetry.Config.IsDebug() then
+        GTelemetry.Debug("Sending to: " .. endpoint .. " (" .. #body .. " bytes)")
+    end
 
     HTTP({
         url = endpoint,
@@ -239,14 +252,21 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
 
         success = function(code, respBody)
             if code >= 200 and code < 300 then
-                callbacks.onSuccess()
-            else
-                callbacks.onFailure("HTTP " .. code .. ": " .. (respBody or "no body"))
+                if callbacks.onSuccess then
+                    local ok, err = pcall(callbacks.onSuccess)
+                    if not ok then GTelemetry.Warn("HTTP onSuccess callback failed: " .. tostring(err)) end
+                end
+            elseif callbacks.onFailure then
+                local ok, err = pcall(callbacks.onFailure, "HTTP " .. code .. ": " .. (respBody or "no body"))
+                if not ok then GTelemetry.Warn("HTTP onFailure callback failed: " .. tostring(err)) end
             end
         end,
 
         failed = function(err)
-            callbacks.onFailure(tostring(err))
+            if callbacks.onFailure then
+                local ok, err2 = pcall(callbacks.onFailure, tostring(err))
+                if not ok then GTelemetry.Warn("HTTP failed callback failed: " .. tostring(err2)) end
+            end
         end,
     })
 end
@@ -261,24 +281,28 @@ function GTelemetry.OTLP.Send(jsonBody)
 
     -- Exponential backoff: skip if still in cooldown window
     if SysTime() < _nextSendTime then
-        GTelemetry.Debug("Skipping send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
+        if GTelemetry.Config.IsDebug() then
+            GTelemetry.Debug("Skipping send (backoff active, next in " .. math_ceil(_nextSendTime - SysTime()) .. "s)")
+        end
         return
     end
 
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            if SysTime() >= _nextSendTime then
+            pcall(function()
                 _backoffAttempts = 0
                 _nextSendTime = 0
-            end
-            GTelemetry.Debug("Metrics sent successfully")
+                GTelemetry.Debug("Metrics sent successfully")
+            end)
         end,
         onFailure = function(errMsg)
-            _backoffAttempts = _backoffAttempts + 1
-            _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
-            GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-            GTelemetry.Warn("Failed to send metrics: " .. errMsg)
-            GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
+            pcall(function()
+                _backoffAttempts = _backoffAttempts + 1
+                _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
+                GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
+                GTelemetry.Warn("Failed to send metrics: " .. errMsg)
+                GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
+            end)
         end,
     })
 end
@@ -291,6 +315,7 @@ function GTelemetry.OTLP.CollectAndSend()
     if not GTelemetry.Config.IsEnabled() then return end
     if _isCollecting then
         GTelemetry.Debug("Skipping collection — previous cycle still in progress")
+        GTelemetry.LastCollectionDuration = nil
         return
     end
     _isCollecting = true
@@ -307,10 +332,12 @@ function GTelemetry.OTLP.CollectAndSend()
 
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Collect then
-                local ok2, result = pcall(collector.Collect, players)
+                local ok2, result = pcall(function() return collector.Collect(players) end)
                 if ok2 and type(result) == "table" then
                     local count = #result
-                    GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
+                    if GTelemetry.Config.IsDebug() then
+                        GTelemetry.Debug("Collector '" .. name .. "' returned " .. count .. " metrics")
+                    end
                     for _, metric in ipairs(result) do
                         table_insert(allMetrics, metric)
                     end
@@ -319,17 +346,24 @@ function GTelemetry.OTLP.CollectAndSend()
                     GTelemetry.OTLP.CollectionErrors = GTelemetry.OTLP.CollectionErrors + 1
                     GTelemetry.Warn("Collector '" .. name .. "' failed: " .. tostring(result))
                 else
-                    GTelemetry.Debug("Collector '" .. name .. "' returned nil (skipped)")
+                    if GTelemetry.Config.IsDebug() then
+                        GTelemetry.Debug("Collector '" .. name .. "' returned nil (skipped)")
+                    end
                 end
             end
         end
 
         if #allMetrics == 0 then
-            GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            if GTelemetry.Config.IsDebug() then
+                GTelemetry.Debug("No metrics collected from " .. collectorCount .. " collectors")
+            end
+            GTelemetry.LastCollectionDuration = 0
             return
         end
 
-        GTelemetry.Debug("Collected " .. #allMetrics .. " metrics from " .. collectorCount .. " collectors")
+        if GTelemetry.Config.IsDebug() then
+            GTelemetry.Debug("Collected " .. #allMetrics .. " metrics from " .. collectorCount .. " collectors")
+        end
 
         local jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
         GTelemetry.OTLP.Send(jsonBody)

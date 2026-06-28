@@ -159,6 +159,7 @@ function GTelemetry.Config.GetEndpoint()
         GTelemetry.Warn("No endpoint configured. Set gtelemetry_endpoint ConVar.")
     elseif not string_match(url, "^https?://") then
         GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
+        url = ""
     end
     return url
 end
@@ -227,6 +228,7 @@ function GTelemetry.Config.GetLogEndpoint()
         GTelemetry.Warn("No log endpoint configured. Set gtelemetry_log_endpoint ConVar.")
     elseif not string_match(url, "^https?://") then
         GTelemetry.Warn("Invalid log endpoint URL (must start with http:// or https://): " .. url)
+        url = ""
     end
     return url
 end
@@ -302,8 +304,18 @@ end
 
 -- Listen for interval changes to recreate the timer
 cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
-    local interval = tonumber(newVal) or 10
-    if interval < 1 then interval = 1 end
+    local interval = tonumber(newVal)
+    if not interval then
+        GTelemetry.Warn("gtelemetry_interval must be a number, got '" .. tostring(newVal) .. "', defaulting to 10")
+        interval = 10
+    end
+    if interval < 1 then
+        GTelemetry.Warn("gtelemetry_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
+        interval = 1
+    elseif interval > 300 then
+        GTelemetry.Warn("gtelemetry_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
+        interval = 300
+    end
 
     if timer.Exists("GTelemetry_Collect") then
         timer.Adjust("GTelemetry_Collect", interval)
@@ -334,16 +346,28 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         end
         -- Re-init log hooks if they were stopped by toggling off
         if GTelemetry.Config.IsLogEnabled() and GTelemetry.StartLogCollection then
-            GTelemetry.StartLogCollection()
+            if not timer.Exists("GTelemetry_LogFlush") then
+                GTelemetry.StartLogCollection()
+            end
         end
     else
         GTelemetry.Log("Telemetry disabled")
         if timer.Exists("GTelemetry_Collect") then
             timer.Remove("GTelemetry_Collect")
         end
-        for _, collector in pairs(GTelemetry.Collectors) do
+        if timer.Exists("GTelemetry_LogFlush") then
+            timer.Remove("GTelemetry_LogFlush")
+        end
+        -- Flush buffered logs before clearing
+        if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+            GTelemetry.OTLP.Logs.Flush()
+        end
+        for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Undo then
-                pcall(collector.Undo)
+                local ok, err = pcall(collector.Undo)
+                if not ok then
+                    GTelemetry.Warn("Collector '" .. tostring(name) .. "' Undo failed: " .. tostring(err))
+                end
             end
         end
     end
@@ -363,6 +387,9 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
         end
     else
         GTelemetry.Log("Log collection disabled")
+        if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+            GTelemetry.OTLP.Logs.Flush()
+        end
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
         end
@@ -387,14 +414,40 @@ cvars.AddChangeCallback("gtelemetry_endpoint", function()
 end, "gtelemetry_endpoint_change")
 
 cvars.AddChangeCallback("gtelemetry_log_endpoint", function()
-    if GTelemetry.OTLP and GTelemetry.OTLP.Logs and GTelemetry.OTLP.Logs.ResetBackoff then
+    if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+        GTelemetry.OTLP.Logs.Flush()
         GTelemetry.OTLP.Logs.ResetBackoff()
     end
 end, "gtelemetry_log_endpoint_change")
 
 -- Listen for bLogs mode changes
 cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
-    GTelemetry.Log("bLogs integration mode changed to: " .. newVal .. " — toggle gtelemetry_log_enabled to apply")
+    local valid = {off = true, replace = true, intercept = true, hybrid = true}
+    if not valid[newVal] then
+        GTelemetry.Warn("Invalid gtelemetry_log_blogs_mode value: " .. tostring(newVal) .. ". Valid: off, replace, intercept, hybrid")
+    end
+    GTelemetry.Log("bLogs integration mode changed to: " .. tostring(newVal) .. " — toggle gtelemetry_log_enabled to apply (in-flight logs will be flushed)")
 end, "gtelemetry_log_blogs_mode_change")
+
+-- Listen for log interval changes to recreate the timer
+cvars.AddChangeCallback("gtelemetry_log_interval", function(_, _, newVal)
+    local interval = tonumber(newVal)
+    if not interval then
+        GTelemetry.Warn("gtelemetry_log_interval must be a number, got '" .. tostring(newVal) .. "', defaulting to 10")
+        interval = 10
+    end
+    if interval < 1 then
+        GTelemetry.Warn("gtelemetry_log_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
+        interval = 1
+    elseif interval > 300 then
+        GTelemetry.Warn("gtelemetry_log_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
+        interval = 300
+    end
+
+    if timer.Exists("GTelemetry_LogFlush") then
+        timer.Adjust("GTelemetry_LogFlush", interval)
+        GTelemetry.Log("Log flush interval changed to " .. interval .. "s")
+    end
+end, "gtelemetry_log_interval_change")
 
 

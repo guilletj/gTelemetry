@@ -45,6 +45,12 @@ local _typeNames = {
     [ENTITY_EFFECT] = "effect",
 }
 
+local _allTypes = {
+    ENTITY_PROPS, ENTITY_RAGDOLL, ENTITY_NPC, ENTITY_WEAPON,
+    ENTITY_VEHICLE, ENTITY_DOOR, ENTITY_SCRIPTED, ENTITY_CONSTRAINT,
+    ENTITY_EFFECT, ENTITY_OTHER,
+}
+
 -- Class cache: class names never change, so cache classification results.
 -- Normal table is fine (<200 unique classes per map).
 local _classCache = {}
@@ -123,6 +129,7 @@ function GTelemetry.Collectors.Entities.Undo()
     MakeDataPoint = nil
     Attribute = nil
     _cycleCount = 0
+    _classCache = {}
 end
 
 --- Collect entity count metrics.
@@ -145,6 +152,10 @@ function GTelemetry.Collectors.Entities.Collect()
 
     local worldTypeCounts = {}
     local playerTypeCounts = {}
+    for _, v in ipairs(_allTypes) do
+        worldTypeCounts[v] = 0
+        playerTypeCounts[v] = 0
+    end
 
     local perPlayer = {} -- [steamID] = { name, types: { [type] = count } }
 
@@ -166,12 +177,12 @@ function GTelemetry.Collectors.Entities.Collect()
             end
 
             -- Owner detection (always — used for world vs player breakdown)
-            local okOwner, owner = pcall(function()
-                if type(ent.CPPIGetOwner) == "function" then
-                    return ent:CPPIGetOwner()
-                end
-                return nil
-            end)
+            local owner
+            local cppiFn = ent.CPPIGetOwner
+            local okOwner
+            if type(cppiFn) == "function" then
+                okOwner, owner = pcall(cppiFn, ent)
+            end
             if not okOwner or not IsValid(owner) then
                 owner = ent.GetCreator and ent:GetCreator()
             end
@@ -205,14 +216,6 @@ function GTelemetry.Collectors.Entities.Collect()
         "Total number of entities in the world",
         "{entities}",
         {MakeDataPoint(totalCount)}
-    )
-
-    -- Players (entity count)
-    metrics[#metrics + 1] = MakeGauge(
-        "gmod.entities.players",
-        "Number of player entities",
-        "{entities}",
-        {MakeDataPoint(player.GetCount())}
     )
 
     -- Physics objects

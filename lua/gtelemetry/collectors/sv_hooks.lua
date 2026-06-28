@@ -140,9 +140,15 @@ function GTelemetry.Collectors.Hooks.Collect()
     local totalHooks, eventCounts
     _hooksCycleCount = (_hooksCycleCount + 1) % _hooksSkipEvery
     if _hooksCycleCount == 1 then
-        totalHooks, eventCounts = CountHooks()
-        _lastTotalHooks = totalHooks
-        _lastEventCounts = eventCounts
+        local ok
+        ok, totalHooks, eventCounts = pcall(CountHooks)
+        if not ok then
+            totalHooks = _lastTotalHooks
+            eventCounts = _lastEventCounts
+        else
+            _lastTotalHooks = totalHooks
+            _lastEventCounts = eventCounts
+        end
     else
         totalHooks = _lastTotalHooks
         eventCounts = _lastEventCounts

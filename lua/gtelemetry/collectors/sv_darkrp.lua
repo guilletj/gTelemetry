@@ -123,14 +123,13 @@ function GTelemetry.Collectors.DarkRP.Collect(players)
     )
 
     -- Average money per player
-    if humanCount > 0 then
-        metrics[#metrics + 1] = MakeGauge(
-            "gmod.darkrp.money_avg",
-            "Average money per player",
-            "{currency}",
-            {MakeDataPoint(math_Round(totalMoney / humanCount, 2))}
-        )
-    end
+    local avgMoney = humanCount > 0 and math_Round(totalMoney / humanCount, 2) or 0
+    metrics[#metrics + 1] = MakeGauge(
+        "gmod.darkrp.money_avg",
+        "Average money per player",
+        "{currency}",
+        {MakeDataPoint(avgMoney)}
+    )
 
     -- Money per player
     if #moneyPoints > 0 then

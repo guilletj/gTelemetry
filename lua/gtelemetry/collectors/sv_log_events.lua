@@ -17,7 +17,7 @@ GTelemetry.Collectors.LogEvents = {}
 
 local _initialized = false
 local _prevMap = nil
-local _serverStarted = false
+local _serverStartLogged = false
 local tostring = tostring
 local AddLog = nil
 local Attribute = nil
@@ -29,12 +29,13 @@ local SEVERITY_ERROR = 17
 
 function GTelemetry.Collectors.LogEvents.Init()
     if _initialized then return end
-    _initialized = true
 
     if not GTelemetry.OTLP.Logs then
         GTelemetry.Warn("LogEvents collector: GTelemetry.OTLP.Logs not available")
         return
     end
+
+    _initialized = true
 
     AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
@@ -265,7 +266,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- Gated behind gtelemetry_log_spawn
     -- ════════════════════════════════════════════════════════════
     hook.Add("PlayerSpawnedProp", "GTelemetry_LogSpawnProp", function(ply, model, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Prop] " .. ply:Nick() .. " spawned " .. tostring(model)
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "spawn"),
@@ -274,7 +275,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedVehicle", "GTelemetry_LogSpawnVehicle", function(ply, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local vClass = IsValid(ent) and ent:GetClass() or "unknown"
         local body = "[Vehicle] " .. ply:Nick() .. " spawned " .. vClass
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -284,7 +285,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedNPC", "GTelemetry_LogSpawnNPC", function(ply, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local npcClass = IsValid(ent) and ent:GetClass() or "unknown"
         local body = "[NPC] " .. ply:Nick() .. " spawned " .. npcClass
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -294,7 +295,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedSENT", "GTelemetry_LogSpawnSENT", function(ply, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(ent) and ent:GetClass() or "unknown"
         local body = "[SENT] " .. ply:Nick() .. " spawned " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -304,7 +305,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedSWEP", "GTelemetry_LogSpawnSWEP", function(ply, swep)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(swep) and swep:GetClass() or "unknown"
         local body = "[SWEP] " .. ply:Nick() .. " spawned " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -314,7 +315,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedRagdoll", "GTelemetry_LogSpawnRagdoll", function(ply, model, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Ragdoll] " .. ply:Nick() .. " spawned " .. tostring(model)
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "spawn"),
@@ -323,7 +324,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerSpawnedEffect", "GTelemetry_LogSpawnEffect", function(ply, model, ent)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Effect] " .. ply:Nick() .. " spawned " .. tostring(model)
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "spawn"),
@@ -335,7 +336,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- Item pickups / weapon drops (gated behind gtelemetry_log_spawn)
     -- ════════════════════════════════════════════════════════════
     hook.Add("PlayerPickupItem", "GTelemetry_LogPickup", function(ply, item)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(item) and item:GetClass() or "unknown"
         local body = ply:Nick() .. " picked up " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -345,7 +346,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     hook.Add("PlayerDroppedWeapon", "GTelemetry_LogDrop", function(ply, weapon)
-        if not IsLogSpawnEnabled() or not IsValid(ply) then return end
+        if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(weapon) and weapon:GetClass() or "unknown"
         local body = ply:Nick() .. " dropped " .. class
         AddLog(SEVERITY_INFO, "INFO", body, {
@@ -360,8 +361,8 @@ function GTelemetry.Collectors.LogEvents.Init()
     hook.Add("InitPostEntity", "GTelemetry_LogMap", function()
         local currentMap = game.GetMap() or "unknown"
 
-        if not _serverStarted then
-            _serverStarted = true
+        if not _serverStartLogged then
+            _serverStartLogged = true
             _prevMap = currentMap
             local hostname = GetHostName and GetHostName() or "unknown"
             local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
@@ -395,6 +396,19 @@ function GTelemetry.Collectors.LogEvents.Init()
             Attribute("log.event", "server_stop"),
         })
     end, 10)
+
+    -- Late-init: emit server start if map already loaded (InitPostEntity already fired)
+    if game.GetMap() and game.GetMap() ~= "" and not _serverStartLogged then
+        _serverStartLogged = true
+        _prevMap = game.GetMap()
+        local hostname = GetHostName and GetHostName() or "unknown"
+        local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
+        local body = "Server started — " .. hostname .. ", map: " .. _prevMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
+        AddLog(SEVERITY_INFO, "INFO", body, {
+            Attribute("log.source", "system"),
+            Attribute("log.event", "server_start"),
+        })
+    end
 
     GTelemetry.Debug("LogEvents collector initialized")
 end

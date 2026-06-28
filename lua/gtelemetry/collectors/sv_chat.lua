@@ -47,6 +47,28 @@ function GTelemetry.Collectors.Chat.Init()
         _adminCommands = _adminCommands + 1
     end)
 
+    -- FAdmin (multiple hook names for version compat)
+    hook.Add("FAdmin_CommandCalled", "GTelemetry_FAdminTracker", function(ply, cmd, args)
+        _adminCommands = _adminCommands + 1
+    end)
+
+    hook.Add("FAdmin.Server.PlayerCommand", "GTelemetry_FAdminServerTracker", function(ply, cmd, args)
+        _adminCommands = _adminCommands + 1
+    end)
+
+    hook.Add("FAdmin_OnCommandExecuted", "GTelemetry_FAdminExecTracker", function(ply, cmd, args, results)
+        _adminCommands = _adminCommands + 1
+    end)
+
+    -- xAdmin free and paid versions
+    hook.Add("xAdminCanRunCommand", "GTelemetry_xAdminTracker", function(ply, cmd, args, fromConsole)
+        _adminCommands = _adminCommands + 1
+    end)
+
+    hook.Add("xAdminCommandRun", "GTelemetry_xAdminPaidTracker", function(ply, target, cmd, args)
+        _adminCommands = _adminCommands + 1
+    end)
+
     GTelemetry.Debug("Chat collector initialized")
 end
 
@@ -58,6 +80,11 @@ function GTelemetry.Collectors.Chat.Undo()
     hook.Remove("ULibCommandCalled", "GTelemetry_ULXTracker")
     hook.Remove("SAM.PlayerCommand", "GTelemetry_SAMTracker")
     hook.Remove("SAM.RanCommand", "GTelemetry_SAMTracker_Ran")
+    hook.Remove("FAdmin_CommandCalled", "GTelemetry_FAdminTracker")
+    hook.Remove("FAdmin.Server.PlayerCommand", "GTelemetry_FAdminServerTracker")
+    hook.Remove("FAdmin_OnCommandExecuted", "GTelemetry_FAdminExecTracker")
+    hook.Remove("xAdminCanRunCommand", "GTelemetry_xAdminTracker")
+    hook.Remove("xAdminCommandRun", "GTelemetry_xAdminPaidTracker")
 
     _chatMessages = 0
     _adminCommands = 0

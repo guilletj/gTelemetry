@@ -35,9 +35,9 @@ function GTelemetry.PrintBanner()
         MsgC(cyan, "[gTelemetry] ", purple, "GMod Telemetry (v" .. GTelemetry.Version .. ")\n")
         MsgC(white, "Desarrollado por: ", yellow, "Edyone ", white, "para ", cyan, "Alienhost\n")
         MsgC(gray, "--------------------------------------------------\n")
-        MsgC(white, "[WEB]     ", cyan, "https://alienhost.net\n")
-        MsgC(white, "[DISCORD] ", cyan, "https://discord.gg/alienhost\n")
-        MsgC(white, "[GITHUB]  ", cyan, "https://github.com/Edyone\n")
+        MsgC(white, "[WEB]     ", cyan, "https://alienhost.es/\n")
+        MsgC(white, "[DISCORD] ", cyan, "@edyone\n")
+        MsgC(white, "[GITHUB]  ", cyan, "https://github.com/guilletj\n")
         MsgC(cyan, "==================================================\n\n")
     else
         local sep = string.rep("=", 50)
@@ -66,18 +66,16 @@ include("gtelemetry/collectors/sv_darkrp.lua")
 -- bLogs bridge: always include the module definition (it's small)
 include("gtelemetry/collectors/sv_blogs.lua")
 
--- Log events: skip core collector when any bLogs bridge mode is active
--- NOTE: IsBlogsAvailable() at load time might return false if GAS hasn't loaded yet.
--- That's safe — sv_log_events is included as fallback, and StartLogCollection()
--- re-checks at runtime to dispatch to the correct collector.
-if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
-    GTelemetry.Log("bLogs detected — using bLogs bridge for log collection")
-else
-    include("gtelemetry/collectors/sv_log_events.lua")
-end
+-- Log events collector: always included. StartLogCollection() dispatches at runtime
+-- between bLogs bridge and core log events based on gtelemetry_log_blogs_mode.
+include("gtelemetry/collectors/sv_log_events.lua")
 
 --- Start (or restart) the metric collection timer.
 function GTelemetry.StartCollection()
+    if GTelemetry.OTLP and GTelemetry.OTLP.ResetBackoff then
+        GTelemetry.OTLP.ResetBackoff()
+    end
+
     local interval = GTelemetry.Config.GetInterval()
 
     timer.Create("GTelemetry_Collect", interval, 0, function()
@@ -92,7 +90,9 @@ function GTelemetry.StartLogCollection()
     if not GTelemetry.Config.IsLogEnabled() then return end
 
     if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
-        GTelemetry.Collectors.BLogs.Init()
+        if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Init then
+            GTelemetry.Collectors.BLogs.Init()
+        end
         GTelemetry._activeLogCollector = "blogs"
     else
         GTelemetry.Collectors.LogEvents.Init()
@@ -104,6 +104,11 @@ function GTelemetry.StartLogCollection()
         return
     end
 
+    if timer.Exists("GTelemetry_LogFlush") then
+        GTelemetry.Debug("Log flush timer already active")
+        return
+    end
+
     local interval = GTelemetry.Config.GetLogInterval()
     timer.Create("GTelemetry_LogFlush", interval, 0, function()
         GTelemetry.OTLP.Logs.Flush()
@@ -112,8 +117,9 @@ function GTelemetry.StartLogCollection()
     GTelemetry.Log("Log collection started (interval: " .. interval .. "s, endpoint: " .. GTelemetry.Config.GetLogEndpoint() .. ")")
 end
 
--- Initialize on server start
+-- Initialize on server start (one-shot: removes itself on first fire)
 hook.Add("InitPostEntity", "GTelemetry_Init", function()
+    hook.Remove("InitPostEntity", "GTelemetry_Init")
     if not GTelemetry.Config.IsEnabled() then
         GTelemetry.Log("Telemetry is disabled. Set gtelemetry_enabled 1 to enable.")
         return
@@ -152,15 +158,16 @@ end)
 if game.GetMap() and game.GetMap() ~= "" then
     timer.Simple(1, function()
         if not timer.Exists("GTelemetry_Collect") and GTelemetry.Config.IsEnabled() then
+            local hibernateCvar = GetConVar("sv_hibernate_think")
+            if hibernateCvar and hibernateCvar:GetInt() == 0 then
+                GTelemetry.Log("WARNING: sv_hibernate_think is 0 — timers will NOT fire when no players are connected.")
+                GTelemetry.Log("Set sv_hibernate_think 1 in server.cfg or add +sv_hibernate_think 1 to your launch args.")
+            end
+
             GTelemetry.StartCollection()
 
             if GTelemetry.Config.IsLogEnabled() and not timer.Exists("GTelemetry_LogFlush") then
                 GTelemetry.StartLogCollection()
-            end
-
-            -- Count current map since InitPostEntity already fired before module load
-            if GTelemetry.Collectors.Map and GTelemetry.Collectors.Map.CountChange then
-                GTelemetry.Collectors.Map.CountChange()
             end
 
             -- Re-request client-ready signals from already-connected players
@@ -190,14 +197,21 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
     -- Attempt one final metrics push before shutting down.
     -- NOTE: HTTP() is asynchronous; the server may close before the
     -- request completes, causing the final payload to be lost.
+    -- Wrap in pcall in case engine state is partially torn down.
     if GTelemetry.Config.IsEnabled() then
         GTelemetry.Debug("Server shutting down, sending final metrics...")
-        GTelemetry.OTLP.CollectAndSend()
+        local ok, err = pcall(GTelemetry.OTLP.CollectAndSend)
+        if not ok then
+            GTelemetry.Warn("Final metrics send failed: " .. tostring(err))
+        end
     end
 
     if GTelemetry.Config.IsLogEnabled() and GTelemetry.OTLP.Logs then
         GTelemetry.Debug("Server shutting down, flushing logs...")
-        GTelemetry.OTLP.Logs.Flush()
+        local ok, err = pcall(GTelemetry.OTLP.Logs.Flush)
+        if not ok then
+            GTelemetry.Warn("Final log flush failed: " .. tostring(err))
+        end
     end
 end)
 
