@@ -33,8 +33,8 @@ local function SendClientReady()
         net.Start("GTelemetry_ClientReady")
         net.SendToServer()
     end)
-    if not ok and GTelemetry and GTelemetry.Debug then
-        GTelemetry.Debug("Failed to send client ready: " .. tostring(err))
+    if not ok then
+        print("[gTelemetry] Failed to send client ready: " .. tostring(err))
     end
 end
 
@@ -51,7 +51,7 @@ timer.Create("GTelemetry_ClientFPS", SEND_INTERVAL, 0, function()
             net.WriteFloat(_currentFps)
         net.SendToServer()
     end)
-    if not ok and GTelemetry and GTelemetry.Debug then
-        GTelemetry.Debug("Failed to send client FPS: " .. tostring(err))
+    if not ok then
+        print("[gTelemetry] Failed to send client FPS: " .. tostring(err))
     end
 end)
