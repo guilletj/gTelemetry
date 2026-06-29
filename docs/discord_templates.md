@@ -1,10 +1,10 @@
 # gTelemetry — Discord Alert Templates
 
-Go templating for Grafana 11+ Discord contact point. One generic template for all gTelemetry alerts, color-coded by severity.
+Go templating for Grafana 13+ Discord contact point. Uses the Notification Templates system (Templates tab) to define reusable templates for embed title and message content, color-coded by severity.
 
 ## Prerequisites
 
-- Grafana 11+ (Discord contact point built-in, no plugin required)
+- Grafana 13+ (Discord contact point built-in, no plugin required)
 - Discord webhook URL (Server Settings → Integrations → Webhooks → New Webhook)
 
 ## Setup
@@ -16,19 +16,75 @@ Go templating for Grafana 11+ Discord contact point. One generic template for al
 3. Name it `gTelemetry Alerts` and select the channel
 4. Copy the **Webhook URL** (`https://discord.com/api/webhooks/...`)
 
-### 2. Create a Grafana Contact Point
+### 2. Create a Notification Template Group
 
-1. In Grafana, go to **Alerting** → **Contact points** → **New contact point**
+1. In Grafana, go to **Alerts & IRM** → **Alerting** → **Notification configuration**
+2. Select the **Templates** tab
+3. Click **+ New notification template**
+4. **Name**: `gTelemetry Discord`
+5. Paste the template block below into the **Content** field
+6. Click **Save notification template**
+
+```go
+{{ define "gtelemetry.title" }}
+  {{- if eq .Status "resolved" -}}
+  ✅ [RECOVERED] {{ (index .Alerts 0).Annotations.summary }}
+  {{- else -}}
+    {{- $severity := "" -}}
+    {{- range .Alerts -}}
+      {{- if eq .Labels.severity "Critical" -}}{{- $severity = "Critical" -}}{{- end -}}
+    {{- end -}}
+    {{- if eq $severity "Critical" -}}🚨{{- else -}}⚠️{{- end -}}
+    [{{ .Status | upper }}] {{ (index .Alerts 0).Annotations.summary }}
+  {{- end -}}
+{{ end -}}
+
+{{ define "gtelemetry.duration" -}}
+  {{- $dur := .EndsAt.Sub .StartsAt -}}
+  {{- $hours := ($dur.Hours) | int -}}
+  {{- $minutes := (mod ($dur.Minutes) 60) | int -}}
+  {{- $seconds := (mod ($dur.Seconds) 60) | int -}}
+  {{- if gt $hours 0 -}}{{$hours}}h {{end -}}
+  {{- if gt $minutes 0 -}}{{$minutes}}m {{end -}}
+  {{$seconds}}s
+{{ end -}}
+
+{{ define "gtelemetry.message" -}}
+  {{- range $i, $alert := .Alerts -}}
+  {{- if $i }}
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {{ end -}}
+  **{{ .Annotations.summary }}**
+  {{ .Annotations.description }}
+  {{- if .Values }}**Value:** {{ range $k, $v := .Values }}{{ $k }} = {{ $v }}{{ end }}
+  {{ end -}}
+  **Server:** {{ index .Labels "service.name" }}
+  {{- if index .Labels "gmod.map" }}
+  **Map:** {{ index .Labels "gmod.map" }}
+  {{- end -}}
+  {{- if eq $.Status "resolved" }}
+  **Duration:** {{ template "gtelemetry.duration" . }}
+  {{- end -}}
+  {{- end -}}
+  **[View alert]({{ .ExternalURL }})**
+{{ end }}
+```
+
+### 3. Create a Grafana Contact Point
+
+1. In Grafana, go to **Alerts & IRM** → **Alerting** → **Contact points** → **New contact point**
 2. Set:
    - **Name**: `gTelemetry Discord`
    - **Integration**: Discord
    - **Discord URL**: your webhook URL
 3. Toggle **Optional Discord settings** → **Use custom message**
-4. Paste the template below into the **Content** field
+4. Set:
+   - **Title**: `{{ template "gtelemetry.title" . }}`
+   - **Message Content**: `{{ template "gtelemetry.message" . }}`
 5. Click **Test** → choose any alert rule → verify the message appears in Discord
 6. **Save contact point**
 
-### 3. Create a Notification Policy
+### 4. Create a Notification Policy
 
 1. Go to **Alerting** → **Notification policies** → **New policy**
 2. Set:
@@ -39,167 +95,51 @@ Go templating for Grafana 11+ Discord contact point. One generic template for al
 
 ---
 
-## Single Generic Template
-
-Copy this into the **Content** field of the Discord contact point (with **Use custom message** enabled):
-
-```go
-{{ define "alert_color" }}
-  {{- if eq .Status "resolved" -}} 5763719
-  {{- else -}}
-    {{- $severity := "" -}}
-    {{- range .Alerts -}}
-      {{- if eq .Labels.severity "Critical" -}}{{- $severity = "Critical" -}}{{- end -}}
-    {{- end -}}
-    {{- if eq $severity "Critical" -}}15548997
-    {{- else -}}15844367
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-
-{{ define "severity_emoji" }}
-  {{- if eq .Status "resolved" -}}✅
-  {{- else -}}
-    {{- $severity := "" -}}
-    {{- range .Alerts -}}
-      {{- if eq .Labels.severity "Critical" -}}{{- $severity = "Critical" -}}{{- end -}}
-    {{- end -}}
-    {{- if eq $severity "Critical" -}}🚨
-    {{- else -}}⚠️
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-
-{{ define "alert_duration" -}}
-  {{- if and .StartsAt .EndsAt -}}
-    {{- $dur := .EndsAt.Sub .StartsAt -}}
-    {{- $hours := ($dur.Hours) | int -}}
-    {{- $minutes := (mod ($dur.Minutes) 60) | int -}}
-    {{- $seconds := (mod ($dur.Seconds) 60) | int -}}
-    {{- if gt $hours 0 -}}{{$hours}}h {{end -}}
-    {{- if gt $minutes 0 -}}{{$minutes}}m {{end -}}
-    {{$seconds}}s
-  {{- end -}}
-{{- end -}}
-
-{{ define "alert_status_tag" -}}
-  {{- if eq .Status "resolved" -}}RECOVERED
-  {{- else -}}{{ .Status | upper }}
-  {{- end -}}
-{{- end -}}
-
-{{ define "alert_embed" -}}
-{
-  "embeds": [
-    {
-      "title": "{{ template "severity_emoji" . }} [{{ template "alert_status_tag" . }}] {{ (index .Alerts 0).Annotations.summary }}",
-      "color": {{ template "alert_color" . }},
-      "fields": [
-        {{- range .Alerts }}
-        {
-          "name": "{{ .Annotations.summary }}",
-          "value": "{{ if eq $.Status "resolved" }}✅ Recovered after {{ template "alert_duration" . }}{{ else }}{{ .Annotations.description }}{{ end }}",
-          "inline": false
-        },
-        {{- if .Values }}
-        {
-          "name": "{{ if eq $.Status "resolved" }}Final Value{{ else }}Value{{ end }}",
-          "value": "{{ range $k, $v := .Values }}{{ $k }} = {{ $v }}\n{{ end }}",
-          "inline": true
-        },
-        {{- end }}
-        {
-          "name": "Server",
-          "value": "{{ index .Labels "service.name" }}",
-          "inline": true
-        },
-        {{- if index .Labels "gmod.map" }}
-        {
-          "name": "Map",
-          "value": "{{ index .Labels "gmod.map" }}",
-          "inline": true
-        },
-        {{- end }}
-        {{- if eq $.Status "resolved" }}
-        {
-          "name": "Duration",
-          "value": "{{ template "alert_duration" . }}",
-          "inline": true
-        },
-        {{- end }}
-        {{- end }}
-        {
-          "name": "Grafana",
-          "value": "[View alert]({{ .ExternalURL }})",
-          "inline": false
-        }
-      ],
-      "timestamp": "{{ if eq .Status "resolved" }}{{ (index .Alerts 0).EndsAt }}{{ else }}{{ (index .Alerts 0).StartsAt }}{{ end }}"
-    }
-  ]
-}
-{{- end -}}
-
-{{ template "alert_embed" . }}
-```
-
-> **Gotcha**: If you use **Notification policies** that group alerts, `.Alerts` will contain multiple items. The template iterates over them and renders one field set per alert in a single embed. For ungrouped alerts (recommended for simplicity), only one alert is in the list.
-
----
-
 ## How It Looks
 
 ### Firing — Critical
 
-![Discord Critical Alert](https://img.shields.io/badge/discord-embed-red)
-
 ```
 🚨 [FIRING] Server overloaded — tick_duration = 1.45
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Server Overloaded:
 Frame time (0.029s) exceeds tick interval (0.015s).
 Server cannot keep up with configured tick rate.
 
-Value:  B8 = 1.45
 Server: gmod-server
 Map:    gm_construct
 
-Grafana: 🔗 View alert
+View alert 🔗
 ```
 
 ### Firing — Warning
 
 ```
 ⚠️ [FIRING] Possible Lua memory leak
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Possible Lua memory leak:
 Lua memory grew by 120MB in the last 10 minutes.
 If sustained, this will crash the server.
 
-Value:  B8 = 125829120
 Server: gmod-server
 Map:    gm_construct
 
-Grafana: 🔗 View alert
+View alert 🔗
 ```
 
 ### Resolved
 
 ```
 ✅ [RECOVERED] Server overloaded
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Server Overloaded:
 ✅ Recovered after 4m 23s
 
-Final Value:  B8 = 0.85
-Server:       gmod-server
-Map:          gm_construct
-Duration:     4m 23s
+Server:   gmod-server
+Map:      gm_construct
+Duration: 4m 23s
 
-Grafana: 🔗 View alert
+View alert 🔗
 ```
 
 ---
@@ -211,7 +151,9 @@ Grafana: 🔗 View alert
 3. Click **Send test notification**
 4. Check your Discord channel for the message
 
-If the test doesn't show the embeds as expected, click **Show preview** to see the rendered JSON before sending.
+To preview the template output before saving, go to **Templates** tab → edit the `gTelemetry Discord` template group → click **Refresh preview**.
+
+---
 
 ## Troubleshooting
 
@@ -221,15 +163,18 @@ If the test doesn't show the embeds as expected, click **Show preview** to see t
 - Check Discord → Server Settings → Integrations → Webhooks → your webhook exists and is not deleted
 - Grafana must have outbound internet access to `discord.com`
 
-### Embed shows raw JSON instead of formatted message
+### Embed shows default title instead of custom
 
-The template must produce valid JSON. Click **Show preview** in the Discord contact point to see the rendered output, then validate it at a JSON validator. Common issues:
-- Trailing commas in JSON
-- Missing quotes around strings
-- Unescaped quotes inside strings (use `\"` or `{{ "" }}`)
+- Verify **Use custom message** is enabled in the Discord contact point
+- Make sure the **Title** field is set to `{{ template "gtelemetry.title" . }}` (exact string)
+- Check the Notification Template group exists and has no syntax errors — use **Refresh preview** on the Templates tab
 
-### Template renders empty
+### Message content appears empty
 
-- Verify **Use custom message** is enabled
-- Make sure there are no syntax errors in the Go template — Grafana silently falls back to default if the template fails
-- Keep the template simple if you're unsure, then add complexity gradually
+- Verify **Message Content** field is set to `{{ template "gtelemetry.message" . }}`
+- Check the template group compiles: navigate to **Templates** tab → edit `gTelemetry Discord` → click **Refresh preview**
+- If the preview shows nothing, check for template syntax errors in the Content field
+
+### Notification Templates vs inline custom message
+
+Grafana's Discord integration uses the Title and Message Content fields **only as plain text content**. The embed is auto-constructed by Grafana (title, footer, color, URL). The Notification Templates approach (recommended) keeps templates in a separate reusable group, avoids inline `define` quirks, and supports preview.
