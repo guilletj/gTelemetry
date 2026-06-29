@@ -68,7 +68,15 @@ Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same grou
   {{- $server := index .Labels "service.name" -}}
   {{- if not $server }}{{ $server = index .Labels "service_name" }}{{ end -}}
   {{- if not $server }}{{ $server = "n/a" }}{{ end -}}
-  **Server:** {{ $server }}{{ if index .Labels "gmod.map" }} • **Map:** {{ index .Labels "gmod.map" }}{{ end }}
+  {{- $map := index .Labels "gmod.map" -}}
+  {{- if not $map }}{{ $map = index .Labels "gmod_map" }}{{ end -}}
+  {{- if not $map }}{{ $map = index .Labels "server.map" }}{{ end -}}
+  {{- if not $map }}{{ $map = index .Labels "server_map" }}{{ end -}}
+  {{- $gm := index .Labels "gmod.gamemode" -}}
+  {{- if not $gm }}{{ $gm = index .Labels "gmod_gamemode" }}{{ end -}}
+  {{- if not $gm }}{{ $gm = index .Labels "server.gamemode" }}{{ end -}}
+  {{- if not $gm }}{{ $gm = index .Labels "server_gamemode" }}{{ end -}}
+  **Server:** {{ $server }}{{ if $map }} • **Map:** {{ $map }}{{ end }}{{ if $gm }} • **Gamemode:** {{ $gm }}{{ end }}
   {{- if eq $.Status "resolved" }}
   **Duration:** {{ template "gtelemetry.duration" . }}
   {{- end -}}
@@ -82,7 +90,7 @@ Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same grou
 Frame time (0.029s) exceeds tick interval (0.015s).
 Server cannot keep up with configured tick rate.
 
-Server: gmod-server • Map: gm_construct
+Server: gmod-server • Map: gm_construct • Gamemode: darkrp
 
 ╔══════════════════════════════════════╗
 ║ 🚨 [FIRING] Server Overloaded          ║  ← embed title
@@ -149,9 +157,20 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
     {{- $server := index .Labels "service.name" -}}
     {{- if not $server }}{{ $server = index .Labels "service_name" }}{{ end -}}
     {{- if not $server }}{{ $server = "n/a" }}{{ end -}}
+    {{- $map := index .Labels "gmod.map" -}}
+    {{- if not $map }}{{ $map = index .Labels "gmod_map" }}{{ end -}}
+    {{- if not $map }}{{ $map = index .Labels "server.map" }}{{ end -}}
+    {{- if not $map }}{{ $map = index .Labels "server_map" }}{{ end -}}
+    {{- $gm := index .Labels "gmod.gamemode" -}}
+    {{- if not $gm }}{{ $gm = index .Labels "gmod_gamemode" }}{{ end -}}
+    {{- if not $gm }}{{ $gm = index .Labels "server.gamemode" }}{{ end -}}
+    {{- if not $gm }}{{ $gm = index .Labels "server_gamemode" }}{{ end -}}
     {{- $fields = coll.Append (coll.Dict "name" "Server" "value" $server "inline" true) $fields -}}
-    {{- if index .Labels "gmod.map" -}}
-      {{- $fields = coll.Append (coll.Dict "name" "Map" "value" (index .Labels "gmod.map") "inline" true) $fields -}}
+    {{- if $map -}}
+      {{- $fields = coll.Append (coll.Dict "name" "Map" "value" $map "inline" true) $fields -}}
+    {{- end -}}
+    {{- if $gm -}}
+      {{- $fields = coll.Append (coll.Dict "name" "Gamemode" "value" $gm "inline" true) $fields -}}
     {{- end -}}
     {{- if eq $.Status "resolved" -}}
       {{- $fields = coll.Append (coll.Dict "name" "Duration" "value" (tmpl.Inline `{{ template "gtelemetry.duration" . }}` .) "inline" false) $fields -}}
@@ -174,7 +193,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Frame time exceeds tick interval. Server can't  ║
 ║ keep up with configured tick rate.              ║
 ║───────────────────────────────────────────────║
-║ Server: gmod-server              Map: gm_construct║
+║ Server: gmod-server • Map: gm_construct • Gamemode: darkrp║
 ║───────────────────────────────────────────────║
 ║ Grafana: 🔗 View alert                         ║
 ╚═══════════════════════════════════════════════╝
@@ -189,7 +208,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Server is empty                                ║
 ║ No players connected for at least 5 minutes.   ║
 ║───────────────────────────────────────────────║
-║ Server: gmod-server              Map: gm_construct║
+║ Server: gmod-server • Map: gm_construct • Gamemode: darkrp║
 ║───────────────────────────────────────────────║
 ║ Grafana: 🔗 View alert                         ║
 ╚═══════════════════════════════════════════════╝
@@ -204,7 +223,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Server Overloaded                               ║
 ║ ✅ Recovered after 4m 23s                       ║
 ║───────────────────────────────────────────────║
-║ Server: gmod-server          Map: gm_construct  ║
+║ Server: gmod-server • Map: gm_construct • Gamemode: darkrp║
 ║───────────────────────────────────────────────║
 ║ Duration: 4m 23s                                ║
 ║───────────────────────────────────────────────║
@@ -252,9 +271,14 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 - Check that the Payload Template field contains the full `{{ template "gtelemetry.custom" . }}` call
 - Namespaced functions (`coll.*`, `data.*`, `tmpl.*`) require Grafana 12+
 
+### Map or Gamemode field missing
+
+- The template tries multiple label variants: `gmod.map` / `gmod_map` / `server.map` / `server_map`, and `gmod.gamemode` / `gmod_gamemode` / `server.gamemode` / `server_gamemode`.
+- If none exist in the alert `.Labels`, the field is simply omitted (no fallback text shown).
+
 ### Server field shows "n/a"
 
-- The template looks for `service.name` (or `service_name`) in the alert `.Labels`. If neither exists, it falls back to `"n/a"`.
+- The template tries `service.name`, `service_name`, then falls back to `"n/a"`.
 - Add the label `service.name` to each alert rule: **Alerting → Alert rules → [your rule] → Labels** → add `service.name` = your server name (e.g. `gmod-server`).
 
 ### Discord Native: embed shows default title
