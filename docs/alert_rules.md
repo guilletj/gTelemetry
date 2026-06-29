@@ -16,13 +16,14 @@ Each alert below specifies these fields:
 | Field | What it does | Recommendation |
 |-------|-------------|----------------|
 | `Severity` | Label attached to the alert | Used for routing and Discord embed color |
-| `For` | How long the condition must be true before firing | Prevents **flapping** — transient spikes don't trigger notifications |
+| `Pending period` | How long the condition must be true before firing | Prevents **flapping** — transient spikes don't trigger notifications |
+| `Keep firing for` | How long the alert keeps firing after the condition is no longer met | Default `0m` (resolve immediately). Useful to avoid flapping on flaky metrics. |
 | `No data` | What happens when the metric stops arriving | `Alerting` for crash detection, `OK` for low-priority |
-| `Auto-resolve` | When the alert recovers automatically | Always true — Grafana resolves when the condition is no longer met for the `For` duration |
+| `Auto-resolve` | When the alert recovers automatically | Always true — Grafana resolves when the condition is no longer met for the pending period |
 
-After the `For` window expires:
+After the pending period expires:
 - If still breaching → **fires** (notification sent)
-- If no longer breaching → **resolves silently** (no extra delay)
+- If no longer breaching → waits for `Keep firing for`, then **resolves silently**
 
 ---
 
@@ -52,7 +53,7 @@ gmod.server.tick_duration > 1
 | Field | Value |
 |-------|-------|
 | Severity | Critical |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | Alerting |
 | Summary | Server overloaded (tick_duration = {{ $value \| humanize }}) |
 | Description | Frame time (`gmod.server.frametime`) exceeds tick interval (`gmod.server.tick_interval`). Server cannot keep up with configured tick rate. |
@@ -71,7 +72,7 @@ gmod.server.fps < 20
 | Field | Value |
 |-------|-------|
 | Severity | Critical |
-| For | `1m` |
+| Pending period | `1m` |
 | No data | Alerting |
 | Summary | Server FPS critically low ({{ $value \| humanize }}) |
 | Description | Server is running at {{ $value }} FPS. Players will experience lag. |
@@ -89,12 +90,12 @@ gmod.server.fps < 30
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `3m` |
+| Pending period | `3m` |
 | No data | Alerting |
 | Summary | Server FPS degraded ({{ $value \| humanize }}) |
 | Description | Server FPS dropped to {{ $value }}. Investigate addons, entities, or physics load. |
 
-**Optimization**: Use a higher `For` (3m) to ignore brief dips during map loads or entity-heavy events.
+**Optimization**: Use a higher `Pending period` (3m) to ignore brief dips during map loads or entity-heavy events.
 
 ---
 
@@ -109,12 +110,12 @@ delta(gmod.server.lua_memory[10m]) > 100 * 1024 * 1024
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Possible Lua memory leak ({{ $value \| humanizeBytes }} in 10m) |
 | Description | Lua memory grew by {{ $value \| humanizeBytes }} in the last 10 minutes. If sustained, this will crash the server. |
 
-**Optimization**: Already rate-based (`delta[10m]`), so `For: 0m` is safe. Change `100MB` to `50MB` for tighter detection on small servers.
+**Optimization**: Already rate-based (`delta[10m]`), so `Pending: 0m` is safe. Change `100MB` to `50MB` for tighter detection on small servers.
 
 ---
 
@@ -127,12 +128,12 @@ gmod.server.lua_memory > 500 * 1024 * 1024
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | Alerting |
 | Summary | Lua memory high ({{ $value \| humanizeBytes }}) |
 | Description | Lua memory at {{ $value \| humanizeBytes }}. GMod servers typically crash above 1-2 GB. |
 
-**Optimization**: `For: 2m` prevents alerting on GC spikes that temporarily push memory up. If your server has many addons, lower the threshold to `300MB`.
+**Optimization**: `Pending: 2m` prevents alerting on GC spikes that temporarily push memory up. If your server has many addons, lower the threshold to `300MB`.
 
 ---
 
@@ -147,7 +148,7 @@ gmod.server.collection_duration > 5
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Metrics collection taking too long ({{ $value }}s) |
 | Description | The collection cycle took {{ $value }} seconds. Increase `gtelemetry_interval` or reduce entity scan frequency (`gtelemetry_entities_interval`). |
@@ -167,13 +168,13 @@ gmod.players.count == 0
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `5m` |
+| Pending period | `5m` |
 | No data | Alerting (crash detection) |
 | Summary | Server is empty |
 | Description | No players connected for at least 5 minutes. |
 | Auto-resolve | `count > 0` |
 
-**Optimization**: `For: 5m` avoids noise during server restarts. Create a **mute timing** in Grafana for known low-traffic hours.
+**Optimization**: `Pending: 5m` avoids noise during server restarts. Create a **mute timing** in Grafana for known low-traffic hours.
 
 ---
 
@@ -188,12 +189,12 @@ delta(gmod.players.count[1m]) < -5
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Sudden player drop ({{ $value \| abs }} in 1m) |
 | Description | {{ $value \| abs }} players disconnected in the last minute. Possible crash, network issue, or server lag spike. |
 
-**Optimization**: Already a delta — immediate firing is correct. No `For` needed. Use with 1.1 (Server Overloaded) to detect if lag caused players to leave.
+**Optimization**: Already a delta — immediate firing is correct. No `Pending period` needed. Use with 1.1 (Server Overloaded) to detect if lag caused players to leave.
 
 ---
 
@@ -206,7 +207,7 @@ delta(gmod.players.count[1m]) > 10
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Player join flood ({{ $value }} in 1m) |
 | Description | {{ $value }} players joined in the last minute. Verify it's not a bot attack. |
@@ -222,12 +223,12 @@ gmod.players.ping_avg > 200
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `3m` |
+| Pending period | `3m` |
 | No data | OK |
 | Summary | High average ping ({{ $value }}ms) |
 | Description | Average ping across all players is {{ $value }}ms. Check server location, network, or upstream bandwidth. |
 
-**Optimization**: `For: 3m` avoids false positives from a single high-ping player skewing the average. Adjust threshold down to `150` for competitive servers.
+**Optimization**: `Pending: 3m` avoids false positives from a single high-ping player skewing the average. Adjust threshold down to `150` for competitive servers.
 
 ---
 
@@ -240,7 +241,7 @@ gmod.network.packet_loss_avg > 10
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | High packet loss ({{ $value }}%) |
 | Description | Average packet loss is {{ $value }}%. Players will experience rubberbanding and disconnects. |
@@ -256,7 +257,7 @@ count(gmod.network.packet_loss > 10) > 2
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | {{ $value }} players with >10% packet loss |
 | Description | Multiple players experiencing high packet loss. Network issue likely. |
@@ -274,12 +275,12 @@ gmod.players.load_time > 60
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Player load time > 60s ({{ $value }}s) |
 | Description | Player {{ $labels.player_name }} ({{ $labels.player_steam_id }}) took {{ $value }}s to load. May indicate slow workshop download or addon issues. |
 
-**Optimization**: Adjust threshold to `120` if your server has many workshop addons. This metric is per-player and fires once per connection — no `For` needed.
+**Optimization**: Adjust threshold to `120` if your server has many workshop addons. This metric is per-player and fires once per connection — no pending period needed.
 
 ---
 
@@ -296,7 +297,7 @@ abs(delta(gmod.entities.total[1m])) > 500
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Entity count changed by {{ $value \| abs }} in 1m |
 | Description | Total entities changed by {{ $value \| abs }} in one minute. Possible prop spam, dupe paste, or mass cleanup. |
@@ -316,7 +317,7 @@ gmod.entities.total > 8000
 | Field | Value |
 |-------|-------|
 | Severity | Critical |
-| For | `1m` |
+| Pending period | `1m` |
 | No data | Alerting |
 | Summary | Entity count critical ({{ $value }}) |
 | Description | {{ $value }} entities in the world. Approaching the Source engine limit (~10000). |
@@ -333,12 +334,12 @@ gmod.entities.total > 5000
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `3m` |
+| Pending period | `3m` |
 | No data | OK |
 | Summary | High entity count ({{ $value }}) |
 | Description | {{ $value }} entities. Performance may degrade. Investigate if growing. |
 
-**Optimization**: `For: 3m` avoids alerting during brief entity spikes (e.g., map transitions when spawning entities).
+**Optimization**: `Pending: 3m` avoids alerting during brief entity spikes (e.g., map transitions when spawning entities).
 
 ---
 
@@ -351,7 +352,7 @@ gmod.entities.by_type{entity.type="prop", entity.owner="player"} > 3000
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Too many props ({{ $value }}) |
 | Description | {{ $value }} props in the world. Excessive props cause server lag. Consider enforcing prop limits. |
@@ -369,12 +370,12 @@ gmod.entities.by_type{entity.type="ragdoll"} > 50
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `5m` |
+| Pending period | `5m` |
 | No data | OK |
 | Summary | Ragdoll accumulation ({{ $value }}) |
 | Description | {{ $value }} ragdolls. Consider auto-cleanup or lower `gmod_ragdoll_cleanup_time`. |
 
-**Optimization**: `For: 5m` prevents alerting during fights where many ragdolls exist momentarily before cleanup.
+**Optimization**: `Pending: 5m` prevents alerting during fights where many ragdolls exist momentarily before cleanup.
 
 ---
 
@@ -389,7 +390,7 @@ gmod.physics.objects > 2000
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Physics objects high ({{ $value }}) |
 | Description | {{ $value }} physics objects. Physics simulation cost scales linearly. |
@@ -407,7 +408,7 @@ gmod.entities.by_type{entity.type="constraint"} > 1000
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `3m` |
+| Pending period | `3m` |
 | No data | OK |
 | Summary | High constraint count ({{ $value }}) |
 | Description | {{ $value }} constraints. May cause physics instability. |
@@ -427,13 +428,13 @@ rate(gmod.lua.errors[5m]) > 5
 | Field | Value |
 |-------|-------|
 | Severity | Critical |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Lua error spike ({{ $value \| humanize }}/s) |
 | Description | Lua errors are occurring at {{ $value }} per second. An addon is likely broken. Check server console for error stack traces. |
 | Auto-resolve | `rate(...[5m]) <= 5` for 2m |
 
-**Optimization**: `For: 2m` ensures the spike is sustained and not a one-off batch of errors from a map transition.
+**Optimization**: `Pending: 2m` ensures the spike is sustained and not a one-off batch of errors from a map transition.
 
 ---
 
@@ -446,12 +447,12 @@ rate(gmod.lua.errors[5m]) > 1
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `5m` |
+| Pending period | `5m` |
 | No data | OK |
 | Summary | Lua errors detected ({{ $value \| humanize }}/s) |
 | Description | Sustained Lua errors at {{ $value }}/s. Investigate before it escalates. |
 
-**Optimization**: `For: 5m` catches slow-burn error accumulation. Lower to `2m` if you want faster detection.
+**Optimization**: `Pending: 5m` catches slow-burn error accumulation. Lower to `2m` if you want faster detection.
 
 ---
 
@@ -466,7 +467,7 @@ rate(gmod.telemetry.collection_errors[5m]) > 0
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Collector failures detected |
 | Description | gTelemetry collectors are failing. Check server console with `gtelemetry_debug 1`. |
@@ -484,13 +485,13 @@ rate(gmod.telemetry.send_failures[10m]) > 0
 | Field | Value |
 |-------|-------|
 | Severity | Critical |
-| For | `3m` |
+| Pending period | `3m` |
 | No data | OK |
 | Summary | Metrics not reaching Alloy |
 | Description | gTelemetry cannot send metrics. Verify Alloy is running, port 4318 is open, and the server has `-allowlocalhttp`. |
 | Auto-resolve | When Alloy comes back and send succeeds for 3m |
 
-**Optimization**: `For: 3m` gives Alloy time to restart during updates. The `[10m]` range already provides smoothing.
+**Optimization**: `Pending: 3m` gives Alloy time to restart during updates. The `[10m]` range already provides smoothing.
 
 ---
 
@@ -505,13 +506,13 @@ absent(gmod.telemetry.active) == 1
 | Field | Value |
 |-------|-------|
 | Severity | Critical |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | — (built-in, fires when data stops) |
 | Summary | gTelemetry stopped reporting |
 | Description | No telemetry data received for at least 2 evaluation intervals. The server may have crashed or the addon stopped working. |
 | Auto-resolve | When `gmod.telemetry.active` reappears |
 
-**Optimization**: `absent()` is the most efficient way to detect server crashes — no `For` needed, fires as soon as the evaluation interval expires without data.
+**Optimization**: `absent()` is the most efficient way to detect server crashes — no pending period needed, fires as soon as the evaluation interval expires without data.
 
 ---
 
@@ -526,7 +527,7 @@ abs(delta(gmod.hooks.count[5m])) > 50
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Hook count changed by {{ $value \| abs }} |
 | Description | {{ $value \| abs }} hooks added or removed. Possible addon reload or Lua script injection. |
@@ -550,7 +551,7 @@ delta(gmod.darkrp.money_total[5m]) < -100000
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Economy dropped by {{ $value \| humanize }} in 5m |
 | Description | Total money in circulation dropped by {{ $value \| abs }}. Could be admin reset or money exploit. |
@@ -566,7 +567,7 @@ delta(gmod.darkrp.money_total[5m]) > 500000
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Economy increased by {{ $value \| humanize }} in 5m |
 | Description | Total money increased by {{ $value }} in 5 minutes. Possible money dupe or admin grant. |
@@ -582,7 +583,7 @@ gmod.darkrp.arrested_count > (gmod.players.count * 0.5)
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `1m` |
+| Pending period | `1m` |
 | No data | OK |
 | Summary | Mass arrest ({{ $value }} players) |
 | Description | Over half the server is arrested. May be a police raid event or an admin abusing arrest. |
@@ -600,7 +601,7 @@ max(gmod.darkrp.money_per_player) > avg(gmod.darkrp.money_per_player) * 10
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Extreme wealth disparity detected |
 | Description | A player has 10x the average money. Investigate for exploits. |
@@ -620,7 +621,7 @@ rate(gmod.network.net_messages_out[1m]) > 5000
 | Field | Value |
 |-------|-------|
 | Severity | Warning |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | Net message flood ({{ $value \| humanize }}/s) |
 | Description | Server is sending {{ $value }} net messages per second. Possible addon spam or attack. |
@@ -636,7 +637,7 @@ rate(gmod.network.net_messages_in[1m]) > 1000
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `2m` |
+| Pending period | `2m` |
 | No data | OK |
 | Summary | High incoming net message rate ({{ $value }}/s) |
 | Description | Receiving {{ $value }} net messages/s from clients. Investigate if sustained. |
@@ -654,7 +655,7 @@ increase(gmod.map.changes[1m]) > 0
 | Field | Value |
 |-------|-------|
 | Severity | Info |
-| For | `0m` |
+| Pending period | `0m` |
 | No data | OK |
 | Summary | Map changed to {{ $labels.server_map }} |
 | Description | Server changed maps. Useful as a reset marker for other alerts. |
@@ -736,7 +737,7 @@ gmod.players.connection_time
 
 | Technique | Applied in | Effect |
 |-----------|-----------|--------|
-| `For` | All alerts with `For > 0` | Condition must be true for N minutes |
+| `Pending period` | All alerts with `Pending period > 0` | Condition must be true for N minutes |
 | Rate/Delta range | `delta[10m]`, `rate[5m]` | Built-in smoothing over the window |
 | `No data` → OK | Non-critical alerts | Prevents alerting during server restarts |
 
@@ -755,10 +756,10 @@ Example: if your p95 for `gmod.entities.total` is 3000, alert at 4000–4500.
 
 ### Recommended evaluation intervals
 
-| `gtelemetry_interval` | Evaluation group | `For` minimum |
+| `gtelemetry_interval` | Evaluation group | `Pending period` minimum |
 |-----------------------|------------------|---------------|
 | 10s (default) | 30s or 1m | 1m |
 | 30s | 1m | 2m |
 | 60s | 2m | 3m |
 
-Rule of thumb: `evaluation >= gtelemetry_interval * 2`, `For >= evaluation * 2` for flapping-sensitive alerts.
+Rule of thumb: `evaluation >= gtelemetry_interval * 2`, `Pending >= evaluation * 2` for flapping-sensitive alerts.
