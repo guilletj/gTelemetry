@@ -63,10 +63,10 @@ Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same grou
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {{ end -}}
   {{ .Annotations.description }}
-  {{- if .Values }}
-  **Value:** {{ range $k, $v := .Values }}{{ $k }} = {{ $v }}{{ end }}
-  {{ end }}
-  **Server:** {{ index .Labels "service.name" }}{{ if index .Labels "gmod.map" }} • **Map:** {{ index .Labels "gmod.map" }}{{ end }}
+  {{- $server := index .Labels "service.name" -}}
+  {{- if not $server }}{{ $server = index .Labels "service_name" }}{{ end -}}
+  {{- if not $server }}{{ $server = "n/a" }}{{ end -}}
+  **Server:** {{ $server }}{{ if index .Labels "gmod.map" }} • **Map:** {{ index .Labels "gmod.map" }}{{ end }}
   {{- if eq $.Status "resolved" }}
   **Duration:** {{ template "gtelemetry.duration" . }}
   {{- end -}}
@@ -141,12 +141,10 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
   {{- $fields := coll.Slice -}}
   {{- range .Alerts -}}
     {{- $fields = coll.Append (coll.Dict "name" .Annotations.summary "value" .Annotations.description "inline" false) $fields -}}
-    {{- if .Values -}}
-      {{- $valStr := "" -}}
-      {{- range $k, $v := .Values -}}{{- $valStr = printf "%s%s = %v\n" $valStr $k $v -}}{{- end -}}
-      {{- $fields = coll.Append (coll.Dict "name" "Value" "value" $valStr "inline" true) $fields -}}
-    {{- end -}}
-    {{- $fields = coll.Append (coll.Dict "name" "Server" "value" (index .Labels "service.name") "inline" true) $fields -}}
+    {{- $server := index .Labels "service.name" -}}
+    {{- if not $server }}{{ $server = index .Labels "service_name" }}{{ end -}}
+    {{- if not $server }}{{ $server = "n/a" }}{{ end -}}
+    {{- $fields = coll.Append (coll.Dict "name" "Server" "value" $server "inline" true) $fields -}}
     {{- if index .Labels "gmod.map" -}}
       {{- $fields = coll.Append (coll.Dict "name" "Map" "value" (index .Labels "gmod.map") "inline" true) $fields -}}
     {{- end -}}
@@ -171,8 +169,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Frame time exceeds tick interval. Server can't  ║
 ║ keep up with configured tick rate.              ║
 ║───────────────────────────────────────────────║
-║ Value:   B8 = 1.45             Server: gmod    ║
-║                               Map: gm_construct║
+║ Server: gmod-server              Map: gm_construct║
 ║───────────────────────────────────────────────║
 ║ Grafana: 🔗 View alert                         ║
 ╚═══════════════════════════════════════════════╝
@@ -234,6 +231,11 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 - The Custom Payload template must produce **valid JSON** — use `data.ToJSONPretty` for structured output
 - Check that the Payload Template field contains the full `{{ template "gtelemetry.custom" . }}` call
 - Namespaced functions (`coll.*`, `data.*`, `tmpl.*`) require Grafana 12+
+
+### Server field shows "n/a"
+
+- The template looks for `service.name` (or `service_name`) in the alert `.Labels`. If neither exists, it falls back to `"n/a"`.
+- Add the label `service.name` to each alert rule: **Alerting → Alert rules → [your rule] → Labels** → add `service.name` = your server name (e.g. `gmod-server`).
 
 ### Discord Native: embed shows default title
 
