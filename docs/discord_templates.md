@@ -27,8 +27,7 @@ Both approaches use a Notification Template group. Create it once and reference 
       {{- if eq (toLower .Labels.severity) "critical" -}}{{- $critical = true -}}{{- end -}}
       {{- if eq (toLower .Labels.severity) "info" -}}{{- $info = true -}}{{- end -}}
     {{- end -}}
-    {{- if $critical -}}🚨{{- else if $info -}}ℹ️{{- else -}}⚠️{{- end -}}
-    [FIRING] {{ (index .Alerts 0).Annotations.summary }}
+    {{- if $critical -}}🚨{{- else if $info -}}ℹ️{{- else -}}⚠️{{- end }} [FIRING] {{ (index .Alerts 0).Annotations.summary }}
   {{- end -}}
 {{ end -}}
 
@@ -68,6 +67,9 @@ Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same grou
   {{- $server := index .Labels "service.name" -}}
   {{- if not $server }}{{ $server = index .Labels "service_name" }}{{ end -}}
   {{- if not $server }}{{ $server = "n/a" }}{{ end -}}
+  {{- $host := index .Labels "host.name" -}}
+  {{- if not $host }}{{ $host = index .Labels "host_name" }}{{ end -}}
+  {{- if $host }}{{ $server = printf "%s (%s)" $server $host }}{{ end -}}
   {{- $map := index .Labels "gmod.map" -}}
   {{- if not $map }}{{ $map = index .Labels "gmod_map" }}{{ end -}}
   {{- if not $map }}{{ $map = index .Labels "server.map" }}{{ end -}}
@@ -90,7 +92,7 @@ Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same grou
 Frame time (0.029s) exceeds tick interval (0.015s).
 Server cannot keep up with configured tick rate.
 
-Server: gmod-server • Map: gm_construct • Gamemode: darkrp
+Server: gmod-server (myserver.local) • Map: gm_construct • Gamemode: darkrp
 
 ╔══════════════════════════════════════╗
 ║ 🚨 [FIRING] Server Overloaded          ║  ← embed title
@@ -157,6 +159,9 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
     {{- $server := index .Labels "service.name" -}}
     {{- if not $server }}{{ $server = index .Labels "service_name" }}{{ end -}}
     {{- if not $server }}{{ $server = "n/a" }}{{ end -}}
+    {{- $host := index .Labels "host.name" -}}
+    {{- if not $host }}{{ $host = index .Labels "host_name" }}{{ end -}}
+    {{- if $host }}{{ $server = printf "%s (%s)" $server $host }}{{ end -}}
     {{- $map := index .Labels "gmod.map" -}}
     {{- if not $map }}{{ $map = index .Labels "gmod_map" }}{{ end -}}
     {{- if not $map }}{{ $map = index .Labels "server.map" }}{{ end -}}
@@ -193,7 +198,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Frame time exceeds tick interval. Server can't  ║
 ║ keep up with configured tick rate.              ║
 ║───────────────────────────────────────────────║
-║ Server: gmod-server • Map: gm_construct • Gamemode: darkrp║
+║ Server: gmod-server (myserver.local) • Map: gm_construct • Gamemode: darkrp║
 ║───────────────────────────────────────────────║
 ║ Grafana: 🔗 View alert                         ║
 ╚═══════════════════════════════════════════════╝
@@ -208,7 +213,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Server is empty                                ║
 ║ No players connected for at least 5 minutes.   ║
 ║───────────────────────────────────────────────║
-║ Server: gmod-server • Map: gm_construct • Gamemode: darkrp║
+║ Server: gmod-server (myserver.local) • Map: gm_construct • Gamemode: darkrp║
 ║───────────────────────────────────────────────║
 ║ Grafana: 🔗 View alert                         ║
 ╚═══════════════════════════════════════════════╝
@@ -223,7 +228,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Server Overloaded                               ║
 ║ ✅ Recovered after 4m 23s                       ║
 ║───────────────────────────────────────────────║
-║ Server: gmod-server • Map: gm_construct • Gamemode: darkrp║
+║ Server: gmod-server (myserver.local) • Map: gm_construct • Gamemode: darkrp║
 ║───────────────────────────────────────────────║
 ║ Duration: 4m 23s                                ║
 ║───────────────────────────────────────────────║
@@ -279,6 +284,7 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ### Server field shows "n/a"
 
 - The template tries `service.name`, `service_name`, then falls back to `"n/a"`.
+- If `host.name` or `host_name` exists, it's appended in parentheses: `gmod-server (myserver.local)`.
 - Add the label `service.name` to each alert rule: **Alerting → Alert rules → [your rule] → Labels** → add `service.name` = your server name (e.g. `gmod-server`).
 
 ### Discord Native: embed shows default title
