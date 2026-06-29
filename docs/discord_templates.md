@@ -20,10 +20,10 @@ Go templating for Grafana 13+ Discord contact point. Uses the Notification Templ
 
 1. In Grafana, go to **Alerts & IRM** → **Alerting** → **Notification configuration**
 2. Select the **Templates** tab
-3. Click **+ New notification template**
+3. Click **+ New notification template group**
 4. **Name**: `gTelemetry Discord`
 5. Paste the template block below into the **Content** field
-6. Click **Save notification template**
+6. Click **Save notification template group**
 
 ```go
 {{ define "gtelemetry.title" }}
@@ -35,18 +35,13 @@ Go templating for Grafana 13+ Discord contact point. Uses the Notification Templ
       {{- if eq .Labels.severity "Critical" -}}{{- $severity = "Critical" -}}{{- end -}}
     {{- end -}}
     {{- if eq $severity "Critical" -}}🚨{{- else -}}⚠️{{- end -}}
-    [{{ .Status | upper }}] {{ (index .Alerts 0).Annotations.summary }}
+    [FIRING] {{ (index .Alerts 0).Annotations.summary }}
   {{- end -}}
 {{ end -}}
 
 {{ define "gtelemetry.duration" -}}
   {{- $dur := .EndsAt.Sub .StartsAt -}}
-  {{- $hours := ($dur.Hours) | int -}}
-  {{- $minutes := (mod ($dur.Minutes) 60) | int -}}
-  {{- $seconds := (mod ($dur.Seconds) 60) | int -}}
-  {{- if gt $hours 0 -}}{{$hours}}h {{end -}}
-  {{- if gt $minutes 0 -}}{{$minutes}}m {{end -}}
-  {{$seconds}}s
+  {{- $dur.Seconds | humanizeDuration -}}
 {{ end -}}
 
 {{ define "gtelemetry.message" -}}
