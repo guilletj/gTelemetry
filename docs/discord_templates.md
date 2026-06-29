@@ -41,7 +41,7 @@ Go templating for Grafana 13+ Discord contact point. Uses the Notification Templ
 
 {{ define "gtelemetry.duration" -}}
   {{- $dur := .EndsAt.Sub .StartsAt -}}
-  {{- $dur.Seconds | humanizeDuration -}}
+  {{- reReplaceAll "\\.\\d+s" "s" (printf "%v" $dur) -}}
 {{ end -}}
 
 {{ define "gtelemetry.message" -}}
