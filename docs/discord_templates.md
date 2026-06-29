@@ -1,29 +1,20 @@
 # gTelemetry — Discord Alert Templates
 
-Go templating for Grafana 13+ Discord contact point. Uses the Notification Templates system (Templates tab) to define reusable templates for embed title and message content, color-coded by severity.
+Go templating for Grafana 13+. Two approaches depending on how much control you need over the Discord embed.
 
 ## Prerequisites
 
-- Grafana 13+ (Discord contact point built-in, no plugin required)
+- Grafana 13+ (Discord integration and Webhook/Custom Payload built-in)
 - Discord webhook URL (Server Settings → Integrations → Webhooks → New Webhook)
 
-## Setup
+## Shared: Notification Template Group
 
-### 1. Create a Discord Webhook
+Both approaches use a Notification Template group. Create it once and reference the templates you need.
 
-1. Open your Discord server settings
-2. Go to **Integrations** → **Webhooks** → **New Webhook**
-3. Name it `gTelemetry Alerts` and select the channel
-4. Copy the **Webhook URL** (`https://discord.com/api/webhooks/...`)
-
-### 2. Create a Notification Template Group
-
-1. In Grafana, go to **Alerts & IRM** → **Alerting** → **Notification configuration**
-2. Select the **Templates** tab
-3. Click **+ New notification template group**
-4. **Name**: `gTelemetry Discord`
-5. Paste the template block below into the **Content** field
-6. Click **Save notification template group**
+1. Go to **Alerts & IRM** → **Alerting** → **Notification configuration** → **Templates** tab
+2. Click **+ New notification template group**
+3. **Name**: `gTelemetry Discord`
+4. Paste this block into the **Content** field and save:
 
 ```go
 {{ define "gtelemetry.title" }}
@@ -43,110 +34,184 @@ Go templating for Grafana 13+ Discord contact point. Uses the Notification Templ
   {{- $dur := .EndsAt.Sub .StartsAt -}}
   {{- reReplaceAll "\\.\\d+s" "s" (printf "%v" $dur) -}}
 {{ end -}}
+```
 
+---
+
+## Approach A — Discord Native (simple)
+
+The Discord integration gives you an embed with title + Grafana footer + URL, plus plain text above it.
+
+### Contact point setup
+
+1. Go to **Contact points** → **New contact point**
+2. **Name**: `gTelemetry Discord` — **Integration**: Discord — **Discord URL**: your webhook URL
+3. Toggle **Optional Discord settings** → **Use custom message**
+4. Set:
+   - **Title**: `{{ template "gtelemetry.title" . }}`
+   - **Message Content**: `{{ template "gtelemetry.message" . }}`
+5. Save
+
+### Add to Notification Template group
+
+Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same group:
+
+```go
 {{ define "gtelemetry.message" -}}
   {{- range $i, $alert := .Alerts -}}
   {{- if $i }}
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   {{ end -}}
-  **{{ .Annotations.summary }}**
   {{ .Annotations.description }}
-  {{- if .Values }}**Value:** {{ range $k, $v := .Values }}{{ $k }} = {{ $v }}{{ end }}
-  {{ end -}}
-  **Server:** {{ index .Labels "service.name" }}
-  {{- if index .Labels "gmod.map" }}
-  **Map:** {{ index .Labels "gmod.map" }}
-  {{- end -}}
+  {{- if .Values }}
+  **Value:** {{ range $k, $v := .Values }}{{ $k }} = {{ $v }}{{ end }}
+  {{ end }}
+  **Server:** {{ index .Labels "service.name" }}{{ if index .Labels "gmod.map" }} • **Map:** {{ index .Labels "gmod.map" }}{{ end }}
   {{- if eq $.Status "resolved" }}
   **Duration:** {{ template "gtelemetry.duration" . }}
   {{- end -}}
   {{- end -}}
-  **[View alert]({{ .ExternalURL }})**
 {{ end }}
 ```
 
-### 3. Create a Grafana Contact Point
-
-1. In Grafana, go to **Alerts & IRM** → **Alerting** → **Contact points** → **New contact point**
-2. Set:
-   - **Name**: `gTelemetry Discord`
-   - **Integration**: Discord
-   - **Discord URL**: your webhook URL
-3. Toggle **Optional Discord settings** → **Use custom message**
-4. Set:
-   - **Title**: `{{ template "gtelemetry.title" . }}`
-   - **Message Content**: `{{ template "gtelemetry.message" . }}`
-5. Click **Test** → choose any alert rule → verify the message appears in Discord
-6. **Save contact point**
-
-### 4. Create a Notification Policy
-
-1. Go to **Alerting** → **Notification policies** → **New policy**
-2. Set:
-   - **Label**: add matcher `service.name = gmod-server` (or your `gtelemetry_service_name`)
-   - **Contact point**: `gTelemetry Discord`
-   - **Override grouping**: optionally set `...` if you want per-alert notifications
-3. Click **Save**
-
----
-
-## How It Looks
-
-### Firing — Critical
+### How it looks (Discord Native)
 
 ```
-🚨 [FIRING] Server overloaded — tick_duration = 1.45
-
-Server Overloaded:
 Frame time (0.029s) exceeds tick interval (0.015s).
 Server cannot keep up with configured tick rate.
 
-Server: gmod-server
-Map:    gm_construct
+Server: gmod-server • Map: gm_construct
 
-View alert 🔗
+╔══════════════════════════════════════╗
+║ 🚨 [FIRING] Server Overloaded          ║  ← embed title
+╠══════════════════════════════════════╣
+║ Grafana v13                   🔗     ║  ← built-in footer + URL
+╚══════════════════════════════════════╝
 ```
 
-### Firing — Warning
+### Pros & cons
 
-```
-⚠️ [FIRING] Possible Lua memory leak
-
-Possible Lua memory leak:
-Lua memory grew by 120MB in the last 10 minutes.
-If sustained, this will crash the server.
-
-Server: gmod-server
-Map:    gm_construct
-
-View alert 🔗
-```
-
-### Resolved
-
-```
-✅ [RECOVERED] Server overloaded
-
-Server Overloaded:
-✅ Recovered after 4m 23s
-
-Server:   gmod-server
-Map:      gm_construct
-Duration: 4m 23s
-
-View alert 🔗
-```
+| Pro | Con |
+|-----|-----|
+| Minimal setup | Embed is fixed (no custom fields, no description in embed) |
+| Uses Grafana's native Discord integration | Text content goes outside/before the embed |
+| Works out of the box | |
 
 ---
 
-## Testing
+## Approach B — Webhook + Custom Payload (full control)
 
-1. In the contact point, click **Test**
-2. Choose an existing alert rule (e.g., `Server Overloaded`)
-3. Click **Send test notification**
-4. Check your Discord channel for the message
+Use a **Webhook contact point** pointed at the same Discord webhook URL, with **Custom Payload** to build the entire embed yourself.
 
-To preview the template output before saving, go to **Templates** tab → edit the `gTelemetry Discord` template group → click **Refresh preview**.
+### Contact point setup
+
+1. Go to **Contact points** → **New contact point**
+2. **Name**: `gTelemetry Discord Webhook` — **Integration**: Webhook
+3. **URL**: your Discord webhook URL
+4. **HTTP Method**: `POST`
+5. In **Optional settings**, set:
+   - **Max Alerts**: `10`
+6. Toggle **Custom Payload** → **Payload Template**: `{{ template "gtelemetry.custom" . }}`
+7. (Optional) Add **Payload Variables** if needed
+8. Save
+
+### Add to Notification Template group
+
+Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
+
+```go
+{{ define "gtelemetry.custom" -}}
+  {{- $color := 15844367 -}}
+  {{- range .Alerts -}}
+    {{- if eq .Labels.severity "Critical" -}}{{- $color = 15548997 -}}{{- end -}}
+  {{- end -}}
+  {{- if eq .Status "resolved" -}}{{- $color = 5763719 -}}{{- end -}}
+  {{ coll.Dict
+    "embeds" (coll.Slice (coll.Dict
+      "title" (tmpl.Inline `{{ template "gtelemetry.title" . }}` .)
+      "color" $color
+      "fields" (tmpl.Exec "gtelemetry.custom_fields" . | data.JSON)
+      "timestamp" (index .Alerts 0).StartsAt
+      "footer" (coll.Dict "text" "gTelemetry")
+    ))
+  | data.ToJSONPretty "  " }}
+{{ end -}}
+
+{{ define "gtelemetry.custom_fields" -}}
+  {{- $fields := coll.Slice -}}
+  {{- range .Alerts -}}
+    {{- $fields = coll.Append (coll.Dict "name" .Annotations.summary "value" .Annotations.description "inline" false) $fields -}}
+    {{- if .Values -}}
+      {{- $valStr := "" -}}
+      {{- range $k, $v := .Values -}}{{- $valStr = printf "%s%s = %v\n" $valStr $k $v -}}{{- end -}}
+      {{- $fields = coll.Append (coll.Dict "name" "Value" "value" $valStr "inline" true) $fields -}}
+    {{- end -}}
+    {{- $fields = coll.Append (coll.Dict "name" "Server" "value" (index .Labels "service.name") "inline" true) $fields -}}
+    {{- if index .Labels "gmod.map" -}}
+      {{- $fields = coll.Append (coll.Dict "name" "Map" "value" (index .Labels "gmod.map") "inline" true) $fields -}}
+    {{- end -}}
+    {{- if eq $.Status "resolved" -}}
+      {{- $fields = coll.Append (coll.Dict "name" "Duration" "value" (tmpl.Inline `{{ template "gtelemetry.duration" . }}` .) "inline" false) $fields -}}
+    {{- end -}}
+  {{- end -}}
+  {{- $fields = coll.Append (coll.Dict "name" "Grafana" "value" (printf "[View alert](%s)" .ExternalURL) "inline" false) $fields -}}
+  {{- $fields | data.ToJSON -}}
+{{ end }}
+```
+
+### How it looks (Custom Payload)
+
+**Firing — Critical**
+
+```
+╔═══════════════════════════════════════════════╗
+║ 🚨 [FIRING] Server Overloaded                   ║
+╠═══════════════════════════════════════════════╣
+║ Server Overloaded                               ║
+║ Frame time exceeds tick interval. Server can't  ║
+║ keep up with configured tick rate.              ║
+║───────────────────────────────────────────────║
+║ Value:   B8 = 1.45             Server: gmod    ║
+║                               Map: gm_construct║
+║───────────────────────────────────────────────║
+║ Grafana: 🔗 View alert                         ║
+╚═══════════════════════════════════════════════╝
+```
+
+**Resolved**
+
+```
+╔═══════════════════════════════════════════════╗
+║ ✅ [RECOVERED] Server Overloaded                ║
+╠═══════════════════════════════════════════════╣
+║ Server Overloaded                               ║
+║ ✅ Recovered after 4m 23s                       ║
+║───────────────────────────────────────────────║
+║ Server: gmod-server          Map: gm_construct  ║
+║───────────────────────────────────────────────║
+║ Duration: 4m 23s                                ║
+║───────────────────────────────────────────────║
+║ Grafana: 🔗 View alert                         ║
+╚═══════════════════════════════════════════════╝
+```
+
+### Pros & cons
+
+| Pro | Con |
+|-----|-----|
+| Full control over embed — fields, color, timestamp, footer | Slightly more setup (Webhook + Custom Payload) |
+| Everything inside the embed (no loose text) | Uses namespaced functions (`coll.Dict`, `data.JSON`, `tmpl.Inline`, `tmpl.Exec`) |
+| Multiple fields per alert, severity-colored | |
+
+---
+
+## Which to choose
+
+| You want... | Use |
+|-------------|-----|
+| Quick setup, default embed is enough | **A — Discord Native** |
+| Custom embed with fields, everything inside | **B — Webhook Custom Payload** |
+| Both — test which looks better | **Both** — they share the same Notification Template group |
 
 ---
 
@@ -154,22 +219,24 @@ To preview the template output before saving, go to **Templates** tab → edit t
 
 ### Message doesn't arrive in Discord
 
-- Verify the webhook URL is correct (Grafana Contact point → Discord URL)
-- Check Discord → Server Settings → Integrations → Webhooks → your webhook exists and is not deleted
+- Verify the webhook URL is correct (Grafana → Contact point → URL)
+- Check Discord → Server Settings → Integrations → Webhooks → your webhook exists
 - Grafana must have outbound internet access to `discord.com`
 
-### Embed shows default title instead of custom
+### Template syntax error
+
+- In the **Templates** tab, edit the `gTelemetry Discord` group → click **Refresh preview**
+- The preview shows errors inline — fix them and re-save
+- Common issues: unclosed `{{ end }}`, missing quotes, invalid function names
+
+### Custom Payload: embed shows as raw JSON text
+
+- The Custom Payload template must produce **valid JSON** — use `data.ToJSONPretty` for structured output
+- Check that the Payload Template field contains the full `{{ template "gtelemetry.custom" . }}` call
+- Namespaced functions (`coll.*`, `data.*`, `tmpl.*`) require Grafana 12+
+
+### Discord Native: embed shows default title
 
 - Verify **Use custom message** is enabled in the Discord contact point
-- Make sure the **Title** field is set to `{{ template "gtelemetry.title" . }}` (exact string)
-- Check the Notification Template group exists and has no syntax errors — use **Refresh preview** on the Templates tab
-
-### Message content appears empty
-
-- Verify **Message Content** field is set to `{{ template "gtelemetry.message" . }}`
-- Check the template group compiles: navigate to **Templates** tab → edit `gTelemetry Discord` → click **Refresh preview**
-- If the preview shows nothing, check for template syntax errors in the Content field
-
-### Notification Templates vs inline custom message
-
-Grafana's Discord integration uses the Title and Message Content fields **only as plain text content**. The embed is auto-constructed by Grafana (title, footer, color, URL). The Notification Templates approach (recommended) keeps templates in a separate reusable group, avoids inline `define` quirks, and supports preview.
+- **Title** field must contain `{{ template "gtelemetry.title" . }}` (exact)
+- Check the Notification Template group on the Templates tab
