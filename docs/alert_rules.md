@@ -763,3 +763,11 @@ Example: if your p95 for `gmod.entities.total` is 3000, alert at 4000–4500.
 | 60s | 2m | 3m |
 
 Rule of thumb: `evaluation >= gtelemetry_interval * 2`, `Pending >= evaluation * 2` for flapping-sensitive alerts.
+
+### Client FPS staleness
+
+`gmod.players.client_fps` is a gauge — when a player disconnects the last value persists for 5 minutes (Prometheus staleness). To query only connected players, join with a metric that only exists per-player:
+
+```promql
+gmod.players.client_fps and on(player_steam_id) (gmod.players.ping > 0)
+```

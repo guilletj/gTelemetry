@@ -81,9 +81,11 @@ Add this alongside `gtelemetry.title` and `gtelemetry.duration` in the same grou
   **Server:** {{ $server }}{{ if $map }} • **Map:** {{ $map }}{{ end }}{{ if $gm }} • **Gamemode:** {{ $gm }}{{ end }}
   {{- if eq $.Status "resolved" -}}
     {{- $dur := .EndsAt.Sub .StartsAt -}}
-    {{- $durStr := reReplaceAll "\\.\\d+s" "s" (printf "%v" $dur) -}}
-    {{- if not (eq $durStr "0s") -}}
+    {{- if gt $dur 0 -}}
+      {{- $durStr := reReplaceAll "\\.\\d+s" "s" (printf "%v" $dur) -}}
+      {{- if not (eq $durStr "0s") -}}
   **Duration:** {{ $durStr }}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
   {{- end -}}
@@ -183,9 +185,11 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
     {{- end -}}
     {{- if eq $.Status "resolved" -}}
       {{- $dur := .EndsAt.Sub .StartsAt -}}
-      {{- $durStr := reReplaceAll "\\.\\d+s" "s" (printf "%v" $dur) -}}
-      {{- if not (eq $durStr "0s") -}}
-      {{- $fields = coll.Append (coll.Dict "name" "Duration" "value" $durStr "inline" false) $fields -}}
+      {{- if gt $dur 0 -}}
+        {{- $durStr := reReplaceAll "\\.\\d+s" "s" (printf "%v" $dur) -}}
+        {{- if not (eq $durStr "0s") -}}
+        {{- $fields = coll.Append (coll.Dict "name" "Duration" "value" $durStr "inline" false) $fields -}}
+        {{- end -}}
       {{- end -}}
     {{- end -}}
   {{- end -}}
