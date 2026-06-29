@@ -21,11 +21,13 @@ Both approaches use a Notification Template group. Create it once and reference 
   {{- if eq .Status "resolved" -}}
   ✅ [RECOVERED] {{ (index .Alerts 0).Annotations.summary }}
   {{- else -}}
-    {{- $severity := "" -}}
+    {{- $critical := false -}}
+    {{- $info := false -}}
     {{- range .Alerts -}}
-      {{- if eq .Labels.severity "Critical" -}}{{- $severity = "Critical" -}}{{- end -}}
+      {{- if eq (toLower .Labels.severity) "critical" -}}{{- $critical = true -}}{{- end -}}
+      {{- if eq (toLower .Labels.severity) "info" -}}{{- $info = true -}}{{- end -}}
     {{- end -}}
-    {{- if eq $severity "Critical" -}}🚨{{- else -}}⚠️{{- end -}}
+    {{- if $critical -}}🚨{{- else if $info -}}ℹ️{{- else -}}⚠️{{- end -}}
     [FIRING] {{ (index .Alerts 0).Annotations.summary }}
   {{- end -}}
 {{ end -}}
@@ -122,9 +124,12 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ```go
 {{ define "gtelemetry.custom" -}}
   {{- $color := 15844367 -}}
+  {{- $critical := false -}}
   {{- range .Alerts -}}
-    {{- if eq .Labels.severity "Critical" -}}{{- $color = 15548997 -}}{{- end -}}
+    {{- if eq (toLower .Labels.severity) "critical" -}}{{- $critical = true -}}{{- end -}}
+    {{- if eq (toLower .Labels.severity) "info" -}}{{- $color = 5793266 -}}{{- end -}}
   {{- end -}}
+  {{- if $critical -}}{{- $color = 15548997 -}}{{- end -}}
   {{- if eq .Status "resolved" -}}{{- $color = 5763719 -}}{{- end -}}
   {{ coll.Dict
     "embeds" (coll.Slice (coll.Dict
@@ -168,6 +173,21 @@ Add these alongside `gtelemetry.title` and `gtelemetry.duration`:
 ║ Server Overloaded                               ║
 ║ Frame time exceeds tick interval. Server can't  ║
 ║ keep up with configured tick rate.              ║
+║───────────────────────────────────────────────║
+║ Server: gmod-server              Map: gm_construct║
+║───────────────────────────────────────────────║
+║ Grafana: 🔗 View alert                         ║
+╚═══════════════════════════════════════════════╝
+```
+
+**Firing — Info**
+
+```
+╔═══════════════════════════════════════════════╗
+║ ℹ️ [FIRING] Server is empty                     ║
+╠═══════════════════════════════════════════════╣
+║ Server is empty                                ║
+║ No players connected for at least 5 minutes.   ║
 ║───────────────────────────────────────────────║
 ║ Server: gmod-server              Map: gm_construct║
 ║───────────────────────────────────────────────║
