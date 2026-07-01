@@ -70,7 +70,7 @@ All metrics are prefixed with `gmod.` for easy filtering.
 
 | Metric | Type | Labels | Description |
 |--------|------|--------|-------------|
-| `gmod.server.info` | Gauge | `server.map`, `server.gamemode`, `server.hostname`, `server.ip` | Server info (always 1, `{info}`). `server.ip` is captured once at first collection and cached for the process lifetime |
+| `gmod.server.info` | Gauge | `server.map`, `server.gamemode`, `server.hostname` | Server info (always 1, `{info}`) |
 | `gmod.map.changes` | Sum | — | Map change count (`{changes}`) |
 
 ## Chat & Admin (`sv_chat.lua`)

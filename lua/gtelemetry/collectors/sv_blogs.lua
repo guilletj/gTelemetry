@@ -283,17 +283,20 @@ local function _cleanupModule()
     GTelemetry.Debug("bLogs bridge hooks removed")
 end
 
-GTelemetry.Collectors.BLogs.Interceptor = {}
+GTelemetry.Collectors.BLogs.Interceptor = GTelemetry.Collectors.BLogs.Interceptor or {}
+-- State promoted to global namespace so re-include doesn't lose it.
+-- All access goes through GTelemetry.Collectors.BLogs.Interceptor.*
+local I = GTelemetry.Collectors.BLogs.Interceptor
 
-local _interceptorActive = false
-local _origLogPhrase = nil
-local _origAddModule = nil
-local _restoreTarget = nil
-local _restoreKey = nil
-local _wrappedModules = nil -- { mod = originalFunction } for fallback path
+I._active = I._active or false
+I._origLogPhrase = nil
+I._origAddModule = nil
+I._restoreTarget = nil
+I._restoreKey = nil
+I._wrappedModules = nil -- { mod = originalFunction } for fallback path
 
-function GTelemetry.Collectors.BLogs.Interceptor.Install()
-    if _interceptorActive then return end
+function I.Install()
+    if I._active then return end
 
     AddLog = AddLog or GTelemetry.OTLP.Logs.AddLog
     Attribute = Attribute or GTelemetry.OTLP.Attribute
@@ -322,13 +325,13 @@ function GTelemetry.Collectors.BLogs.Interceptor.Install()
             return false
         end
 
-        _origLogPhrase = rawget(target, key)
-        _restoreTarget = target
-        _restoreKey = key
+        I._origLogPhrase = rawget(target, key)
+        I._restoreTarget = target
+        I._restoreKey = key
 
         target[key] = function(self, ...)
-            local ok, r1, r2, r3 = pcall(_origLogPhrase, self, ...)
-            pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, self, ...)
+            local ok, r1, r2, r3 = pcall(I._origLogPhrase, self, ...)
+            pcall(I.OnLog, self, ...)
             if ok then return r1, r2, r3 end
         end
 
@@ -336,25 +339,25 @@ function GTelemetry.Collectors.BLogs.Interceptor.Install()
     end)
 
     if ok and found then
-        _interceptorActive = true
-        GTelemetry.Debug("bLogs bridge: wrapped " .. _restoreKey .. " on module metatable")
+        I._active = true
+        GTelemetry.Debug("bLogs bridge: wrapped " .. I._restoreKey .. " on module metatable")
     else
         GTelemetry.Warn("bLogs bridge: could not find LogPhrase on metatable — wrapping AddModule as fallback")
-        GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
+        I._WrapAddModule()
     end
 end
 
-function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
+function I._WrapAddModule()
     if type(GAS.Logging.AddModule) ~= "function" then
         GTelemetry.Warn("bLogs bridge: GAS.Logging.AddModule not available")
         return
     end
 
-    _wrappedModules = _wrappedModules or {}
+    I._wrappedModules = I._wrappedModules or {}
 
-    _origAddModule = GAS.Logging.AddModule
+    I._origAddModule = GAS.Logging.AddModule
     GAS.Logging.AddModule = function(self, mod)
-        local result = _origAddModule(self, mod)
+        local result = I._origAddModule(self, mod)
 
         local entry = {}
         if type(mod.LogPhrase) == "function" then
@@ -362,7 +365,7 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
             local orig = mod.LogPhrase
             mod.LogPhrase = function(innerSelf, ...)
                 local ok, r1, r2, r3 = pcall(orig, innerSelf, ...)
-                pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
+                pcall(I.OnLog, innerSelf, ...)
                 if ok then return r1, r2, r3 end
             end
         end
@@ -371,22 +374,22 @@ function GTelemetry.Collectors.BLogs.Interceptor._WrapAddModule()
             local orig = mod.Phrase
             mod.Phrase = function(innerSelf, ...)
                 local ok, r1, r2, r3 = pcall(orig, innerSelf, ...)
-                pcall(GTelemetry.Collectors.BLogs.Interceptor.OnLog, innerSelf, ...)
+                pcall(I.OnLog, innerSelf, ...)
                 if ok then return r1, r2, r3 end
             end
         end
         if next(entry) then
-            _wrappedModules[mod] = entry
+            I._wrappedModules[mod] = entry
         end
 
         return result
     end
 
-    _interceptorActive = true
+    I._active = true
     GTelemetry.Debug("bLogs bridge: wrapped GAS.Logging.AddModule")
 end
 
-function GTelemetry.Collectors.BLogs.Interceptor.OnLog(self, phraseKey, ...)
+function I.OnLog(self, phraseKey, ...)
     local category = self.Category or "unknown"
     local name = self.Name or "unknown"
     local args = {...}
@@ -409,18 +412,18 @@ function GTelemetry.Collectors.BLogs.Interceptor.OnLog(self, phraseKey, ...)
     })
 end
 
-function GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
-    if not _interceptorActive then return end
-    _interceptorActive = false
+function I.Uninstall()
+    if not I._active then return end
+    I._active = false
 
-    if _restoreTarget and _restoreKey and _origLogPhrase then
-        _restoreTarget[_restoreKey] = _origLogPhrase
-        GTelemetry.Debug("bLogs bridge: restored original " .. _restoreKey)
+    if I._restoreTarget and I._restoreKey and I._origLogPhrase then
+        I._restoreTarget[I._restoreKey] = I._origLogPhrase
+        GTelemetry.Debug("bLogs bridge: restored original " .. I._restoreKey)
     end
 
-    if _wrappedModules then
+    if I._wrappedModules then
         local count = 0
-        for mod, entry in pairs(_wrappedModules) do
+        for mod, entry in pairs(I._wrappedModules) do
             count = count + 1
             if entry.LogPhrase and type(mod.LogPhrase) == "function" and mod.LogPhrase ~= entry.LogPhrase then
                 mod.LogPhrase = entry.LogPhrase
@@ -429,17 +432,17 @@ function GTelemetry.Collectors.BLogs.Interceptor.Uninstall()
                 mod.Phrase = entry.Phrase
             end
         end
-        _wrappedModules = nil
+        I._wrappedModules = nil
         GTelemetry.Debug("bLogs bridge: restored " .. count .. " wrapped modules")
     end
 
-    if _origAddModule then
-        GAS.Logging.AddModule = _origAddModule
-        _origAddModule = nil
+    if I._origAddModule then
+        GAS.Logging.AddModule = I._origAddModule
+        I._origAddModule = nil
         GTelemetry.Debug("bLogs bridge: restored original AddModule")
     end
 
-    _origLogPhrase = nil
-    _restoreTarget = nil
-    _restoreKey = nil
+    I._origLogPhrase = nil
+    I._restoreTarget = nil
+    I._restoreKey = nil
 end

@@ -100,7 +100,9 @@ function GTelemetry.OTLP.Attribute(key, value)
     elseif valType == "boolean" then
         otlpValue = {boolValue = value}
     else
-        otlpValue = {stringValue = tostring(value)}
+        local s = tostring(value)
+        s = s:gsub("[\000-\008\011\012\014-\031\127]", "")
+        otlpValue = {stringValue = s}
     end
 
     return {key = key, value = otlpValue}
@@ -256,7 +258,7 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
         headers = headers,
         body = body,
         type = "application/json",
-        timeout = 10,
+        timeout = 30,
 
         success = function(code, respBody)
             if code >= 200 and code < 300 then
@@ -381,3 +383,21 @@ function GTelemetry.OTLP.CollectAndSend()
     GTelemetry.OTLP._cycleTimeNano = nil
     _isCollecting = false
 end
+
+-- Re-register collection timer on map change. The one-shot InitPostEntity
+-- hook in gtelemetry_init.lua only fires on first load; this permanent hook
+-- ensures the timer and backoff reset on every map change without re-executing
+-- the entire init file.
+hook.Add("InitPostEntity", "GTelemetry_ReRegister", function()
+    if not GTelemetry.Config.IsEnabled() then return end
+
+    GTelemetry.OTLP.ResetBackoff()
+
+    if not timer.Exists("GTelemetry_Collect") then
+        local interval = GTelemetry.Config.GetInterval()
+        timer.Create("GTelemetry_Collect", interval, 0, function()
+            GTelemetry.OTLP.CollectAndSend()
+        end)
+        GTelemetry.Debug("Collection timer re-registered on map change (interval: " .. interval .. "s)")
+    end
+end)

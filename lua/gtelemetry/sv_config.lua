@@ -16,6 +16,11 @@ local table_insert = table.insert
 local table_concat = table.concat
 local string_match = string.match
 
+-- Cache validated endpoint URLs to avoid parsing every cycle.
+-- Invalidated on their respective change callbacks.
+local _cachedEndpoint = nil
+local _cachedLogEndpoint = nil
+
 -- Shared utilities
 GTelemetry.Util = GTelemetry.Util or {}
 
@@ -201,10 +206,13 @@ local function _clampInterval(newVal, min, max, default, name)
     return val
 end
 
---- Returns the OTLP endpoint URL.
+--- Returns the OTLP endpoint URL (cached).
 -- @return string
 function GTelemetry.Config.GetEndpoint()
-    return _validateEndpoint(GTelemetry.Config.ConVars.endpoint:GetString(), "endpoint")
+    if _cachedEndpoint == nil then
+        _cachedEndpoint = _validateEndpoint(GTelemetry.Config.ConVars.endpoint:GetString(), "endpoint")
+    end
+    return _cachedEndpoint
 end
 
 --- Returns the collection interval in seconds.
@@ -263,10 +271,13 @@ function GTelemetry.Config.IsLogEnabled()
     return GTelemetry.Config.ConVars.log_enabled:GetBool()
 end
 
---- Returns the OTLP log endpoint URL.
+--- Returns the OTLP log endpoint URL (cached).
 -- @return string
 function GTelemetry.Config.GetLogEndpoint()
-    return _validateEndpoint(GTelemetry.Config.ConVars.log_endpoint:GetString(), "log_endpoint")
+    if _cachedLogEndpoint == nil then
+        _cachedLogEndpoint = _validateEndpoint(GTelemetry.Config.ConVars.log_endpoint:GetString(), "log_endpoint")
+    end
+    return _cachedLogEndpoint
 end
 
 --- Returns the log flush interval in seconds.
@@ -435,12 +446,14 @@ end, "gtelemetry_log_enabled_change")
 
 -- Reset backoff when endpoint changes
 cvars.AddChangeCallback("gtelemetry_endpoint", function()
+    _cachedEndpoint = nil
     if GTelemetry.OTLP and GTelemetry.OTLP.ResetBackoff then
         GTelemetry.OTLP.ResetBackoff()
     end
 end, "gtelemetry_endpoint_change")
 
 cvars.AddChangeCallback("gtelemetry_log_endpoint", function()
+    _cachedLogEndpoint = nil
     if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
         GTelemetry.OTLP.Logs.Flush()
         GTelemetry.OTLP.Logs.ResetBackoff()

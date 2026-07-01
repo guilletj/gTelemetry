@@ -204,7 +204,7 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
     -- Wrap in pcall in case engine state is partially torn down.
     if GTelemetry.Config.IsEnabled() then
         GTelemetry.Debug("Server shutting down, sending final metrics...")
-        local ok, err = pcall(function() GTelemetry.OTLP:CollectAndSend() end)
+        local ok, err = pcall(function() GTelemetry.OTLP.CollectAndSend() end)
         if not ok then
             GTelemetry.Warn("Final metrics send failed: " .. tostring(err))
         end
@@ -212,7 +212,7 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
 
     if GTelemetry.Config.IsLogEnabled() and GTelemetry.OTLP.Logs then
         GTelemetry.Debug("Server shutting down, flushing logs...")
-        local ok, err = pcall(function() GTelemetry.OTLP.Logs:Flush() end)
+        local ok, err = pcall(function() GTelemetry.OTLP.Logs.Flush() end)
         if not ok then
             GTelemetry.Warn("Final log flush failed: " .. tostring(err))
         end

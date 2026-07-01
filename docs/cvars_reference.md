@@ -14,7 +14,7 @@ All configuration is managed via server ConVars. Set them in `server.cfg` or via
 | `gtelemetry_debug` | `0` | ARCHIVE | Enable verbose debug logging to server console |
 | `gtelemetry_darkrp` | `1` | ARCHIVE | Enable DarkRP economic metrics (still requires DarkRP) |
 | `gtelemetry_entities_per_player` | `1` | ARCHIVE | Enable per-player entity ownership breakdown (high cardinality) |
-| `gtelemetry_entities_interval` | `1` | ARCHIVE | Collect entity metrics every N cycles (1 = every cycle) |
+| `gtelemetry_entities_interval` | `5` | ARCHIVE | Collect entity metrics every N cycles (1 = every cycle, 5 = every fifth) |
 | `gtelemetry_network_details` | `0` | ARCHIVE | Enable per-message-name net message breakdown (high cardinality) |
 | `gtelemetry_version` | `1.5.8` | ARCHIVE, NOTIFY, REPLICATED | Version info (replicated to clients, notified on change) |
 

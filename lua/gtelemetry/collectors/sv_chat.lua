@@ -34,15 +34,13 @@ function GTelemetry.Collectors.Chat.Init()
         _chatMessages = _chatMessages + 1
     end)
 
-    -- Hook into ULX/SAM (safe even if events don't exist yet)
+    -- Hook into ULX/SAM/FAdmin/xAdmin (safe even if events don't exist yet)
     hook.Add("ULibCommandCalled", "GTelemetry_ULXTracker", function(ply, cmd, args)
         _adminCommands = _adminCommands + 1
     end)
 
-    hook.Add("SAM.PlayerCommand", "GTelemetry_SAMTracker", function(ply, cmd, args)
-        _adminCommands = _adminCommands + 1
-    end)
-
+    -- SAM.RanCommand is the modern hook (SAM 3.x+). SAM.PlayerCommand is legacy and
+    -- also fires on modern SAM causing double-count, so only RanCommand is hooked.
     hook.Add("SAM.RanCommand", "GTelemetry_SAMTracker_Ran", function(ply, cmd_name, args, cmd)
         _adminCommands = _adminCommands + 1
     end)
@@ -78,7 +76,6 @@ function GTelemetry.Collectors.Chat.Undo()
 
     hook.Remove("PlayerSay", "GTelemetry_ChatTracker")
     hook.Remove("ULibCommandCalled", "GTelemetry_ULXTracker")
-    hook.Remove("SAM.PlayerCommand", "GTelemetry_SAMTracker")
     hook.Remove("SAM.RanCommand", "GTelemetry_SAMTracker_Ran")
     hook.Remove("FAdmin_CommandCalled", "GTelemetry_FAdminTracker")
     hook.Remove("FAdmin.Server.PlayerCommand", "GTelemetry_FAdminServerTracker")

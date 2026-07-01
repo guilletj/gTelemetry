@@ -55,6 +55,7 @@ function GTelemetry.Collectors.Map.Undo()
     if not _initialized then return end
     _initialized = false
     hook.Remove("InitPostEntity", "GTelemetry_MapInit")
+    _mapChanges = 0
     _startTimeNano = nil
     _mapChangesAtInit = 0
     _mapCountedThisLoad = false

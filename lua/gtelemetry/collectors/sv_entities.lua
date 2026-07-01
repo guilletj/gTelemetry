@@ -56,10 +56,11 @@ local _allTypes = {
 local _classCache = {}
 local _noPhysicsCache = {}  -- classes confirmed to have no physics object
 
--- Non-physics prefix pattern. Covers env_, info_, ai_, logic_, item_, math_, light_, trigger_.
+-- Non-physics prefix pattern. Covers env_, ai_, logic_, math_, light_, trigger_.
+-- 'i' is split explicitly: info_ (no physics) excluded here, item_ (has physics) not.
 -- 'p' and 's' prefixes are disambiguated in EntityHasPhysics (prop_/sent_ have physics,
 -- point_/path_/scene_/shadow_/sprite_ don't).
-local _physicsNoMatch = "^[aeilmt]"
+local _physicsNoMatch = "^[aelmt]"
 
 --- Classify an entity into a numeric type. Results cached by class string.
 -- @param ent Entity
@@ -99,13 +100,15 @@ local function ClassifyEntity(ent, class)
 end
 
 --- Check if an entity class may have a physics object (avoids expensive GetPhysicsObject call on known non-physics entities).
--- Single regex for 8 non-physics prefixes + explicit disambiguation for 'p' and 's' prefixes
--- (point_/path_ have no physics, prop_ does; scene_/shadow_/sprite_ have no physics, sent_ does).
--- Matches: env_, info_, ai_, logic_, item_, math_, scene_, shadow_, sprite_, light_, trigger_, point_, path_
+-- Regex for 6 non-physics prefixes + explicit disambiguation for 'i', 'p', and 's' prefixes
+-- (info_ has no physics, item_ does; point_/path_ have no physics, prop_ does;
+--  scene_/shadow_/sprite_ have no physics, sent_ does).
+-- Matches: env_, ai_, logic_, math_, light_, trigger_, info_, point_, path_, scene_, shadow_, sprite_
 -- @param class string class name
 -- @return boolean
 local function EntityHasPhysics(class)
     if string_match(class, _physicsNoMatch) then return false end
+    if string_StartWith(class, "info_") then return false end
     if string_StartWith(class, "point_") or string_StartWith(class, "path_") then return false end
     if string_StartWith(class, "scene_") or string_StartWith(class, "shadow_") or string_StartWith(class, "sprite_") then return false end
     return true

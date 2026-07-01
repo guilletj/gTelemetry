@@ -44,16 +44,26 @@ local function _reinsertRecords(records)
     local currentStart = _bufferStart
     local currentSize = _bufferSize
     local maxSize = GTelemetry.Config.GetLogBufferSize()
+
+    -- If buffer was reset by Flush() (snapStart > current logical range),
+    -- use position 1 instead of the stale snapshot position.
+    -- This prevents writing records beyond the ring buffer's logical range
+    -- when Flush() reset _bufferStart to 1 but snapStart was captured earlier.
+    local insertPos = snapStart
+    if snapStart > currentStart + currentSize and currentSize < maxSize then
+        insertPos = 1
+    end
+
     local toInsert = math.min(failedCount, maxSize - currentSize)
-    -- Shift existing records (added after flush) to make room at snapshot position
+    -- Shift existing records (added after flush) to make room at insert position
     for i = currentSize, 1, -1 do
-        _logBuffer[snapStart + toInsert + i - 1] = _logBuffer[currentStart + i - 1]
+        _logBuffer[insertPos + toInsert + i - 1] = _logBuffer[currentStart + i - 1]
         _logBuffer[currentStart + i - 1] = nil
     end
     for i = 1, toInsert do
-        _logBuffer[snapStart + i - 1] = records[i]
+        _logBuffer[insertPos + i - 1] = records[i]
     end
-    _bufferStart = snapStart
+    _bufferStart = insertPos
     _bufferSize = currentSize + toInsert
     if toInsert < failedCount then
         GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + (failedCount - toInsert)
@@ -102,7 +112,7 @@ function GTelemetry.OTLP.Logs.AddLog(severityNumber, severityText, body, attribu
         _bufferSize = _bufferSize - 1
     end
 
-    if _bufferStart > maxSize * 2 then
+    if _bufferStart > maxSize + math.ceil(maxSize / 2) then
         local newBuf = {}
         for i = 1, _bufferSize do
             newBuf[i] = _logBuffer[_bufferStart + i - 1]
