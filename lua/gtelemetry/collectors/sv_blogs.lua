@@ -30,14 +30,10 @@ local tostring = tostring
 local table_concat = table.concat
 local safeConcat = GTelemetry.Util.safeConcat
 
-function GTelemetry.Collectors.BLogs.IsAvailable()
-    return GAS and GAS.Logging and type(GAS.Logging.MODULE) == "function"
-end
-
 function GTelemetry.Collectors.BLogs.Init()
     if _initialized then return end
 
-    if not GTelemetry.Collectors.BLogs.IsAvailable() then
+    if not GTelemetry.Config.IsBlogsAvailable() then
         GTelemetry.Warn("bLogs bridge: GAS.Logging not available")
         return
     end
