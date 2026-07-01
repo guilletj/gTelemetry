@@ -74,10 +74,7 @@ function GTelemetry.Collectors.DarkRP.Collect(players)
                 local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
                 totalMoney = totalMoney + money
                 if money > 0 then
-                    moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, {
-                        Attribute("player.name", ply:Nick()),
-                        Attribute("player.steam_id", ply:SteamID()),
-                    })
+                    moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, GTelemetry.OTLP.PlayerAttrs(ply:Nick(), ply:SteamID()))
                 end
 
                 -- Job
@@ -163,10 +160,7 @@ function GTelemetry.Collectors.DarkRP.Collect(players)
     for _, data in ipairs(propsPerPlayer) do
         local ply = data.player
         if IsValid(ply) then
-            propPoints[#propPoints + 1] = MakeDataPoint(data.count, {
-                Attribute("player.name", ply:Nick()),
-                Attribute("player.steam_id", ply:SteamID()),
-            })
+            propPoints[#propPoints + 1] = MakeDataPoint(data.count, GTelemetry.OTLP.PlayerAttrs(ply:Nick(), ply:SteamID()))
         end
     end
 

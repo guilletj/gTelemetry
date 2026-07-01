@@ -42,6 +42,12 @@ function GTelemetry.Util.safeConcat(t, sep)
     return table_concat(parts, sep or " ")
 end
 
+function GTelemetry.Util.safeArgs(args, nilDefault)
+    if args == nil then return nilDefault or "nil" end
+    if type(args) == "table" then return GTelemetry.Util.safeConcat(args) end
+    return tostring(args)
+end
+
 -- ConVar definitions
 GTelemetry.Config.ConVars = {
     enabled = CreateConVar(

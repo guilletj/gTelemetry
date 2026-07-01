@@ -161,35 +161,35 @@ local _hookSpecs = {
     end},
     {event = "ULibCommandCalled", id = "GTelemetry_BLogs_ulx", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. (args and safeConcat(args) or ""), {Attribute("log.source", "admin"), Attribute("admin.mod", "ulx")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/ULX] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args, ""), {Attribute("log.source", "admin"), Attribute("admin.mod", "ulx")})
     end},
     {event = "SAM.RanCommand", id = "GTelemetry_BLogs_sam", fn = function(ply, cmd_name, args)
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},
     {event = "SAM.PlayerCommand", id = "GTelemetry_BLogs_sam_legacy", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},
     {event = "FAdmin_CommandCalled", id = "GTelemetry_BLogs_fadmin", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
     end},
     {event = "FAdmin.Server.PlayerCommand", id = "GTelemetry_BLogs_fadmin_server", fn = function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
     end},
     {event = "FAdmin_OnCommandExecuted", id = "GTelemetry_BLogs_fadmin_exec", fn = function(ply, cmd, args, results)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
     end},
     {event = "xAdminCanRunCommand", id = "GTelemetry_BLogs_xadmin", fn = function(ply, cmd, args, fromConsole)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
     end},
     {event = "xAdminCommandRun", id = "GTelemetry_BLogs_xadmin_paid", fn = function(ply, target, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. (type(args) == "table" and safeConcat(args) or tostring(args)), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
+        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
     end},
     {event = "PlayerSpawnedProp", id = "GTelemetry_BLogs_spawn_prop", fn = function(ply, model, ent)
         if not GTelemetry.Config.IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end

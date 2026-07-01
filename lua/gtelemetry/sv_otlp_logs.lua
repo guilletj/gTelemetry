@@ -36,9 +36,6 @@ local _nextSendTime = 0
 local _maxBackoff = 30
 local _isFlushing = false
 local _stopped = false
-local _cachedGamemode = nil
-local _cachedHostname = nil
-
 --- Prepend records to buffer, using the snapshot captured at flush extraction.
 -- This ensures correct buffer positioning even if AddLog ran between extraction
 -- and reinsertion (e.g., from an async HTTP callback).
@@ -64,14 +61,6 @@ local function _reinsertRecords(records)
         GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + (failedCount - toInsert)
     end
 end
-
-hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_Logs_GamemodeCache", function()
-    _cachedGamemode = nil
-end)
-
-cvars.AddChangeCallback("hostname", function()
-    _cachedHostname = nil
-end, "GTelemetry_Logs_HostnameCache")
 
 function GTelemetry.OTLP.Logs.ResetBackoff()
     _backoffAttempts = 0
@@ -130,13 +119,13 @@ end
 
 --- Build the OTLP log payload.
 function GTelemetry.OTLP.Logs.BuildPayload(logRecords)
-    if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
+    if not GTelemetry.OTLP._cachedHostname then GTelemetry.OTLP._cachedHostname = GetHostName and GetHostName() or "unknown" end
     local currentMap = game.GetMap() or "unknown"
     local serviceName = GTelemetry.Config.GetServiceName()
 
-    if not _cachedGamemode then
+    if not GTelemetry.OTLP._cachedGamemode then
         local gm = gmod.GetGamemode()
-        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gm and gm.Name) or "unknown"
+        GTelemetry.OTLP._cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gm and gm.Name) or "unknown"
     end
 
     local payload = {
@@ -146,9 +135,9 @@ function GTelemetry.OTLP.Logs.BuildPayload(logRecords)
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
                         GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.8"),
-                        GTelemetry.OTLP.Attribute("host.name", _cachedHostname),
+                        GTelemetry.OTLP.Attribute("host.name", GTelemetry.OTLP._cachedHostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
-                        GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
+                        GTelemetry.OTLP.Attribute("gmod.gamemode", GTelemetry.OTLP._cachedGamemode),
                     },
                 },
                 scopeLogs = {

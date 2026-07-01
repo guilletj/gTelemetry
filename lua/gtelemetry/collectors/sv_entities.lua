@@ -266,19 +266,15 @@ function GTelemetry.Collectors.Entities.Collect()
         local ownedPoints = {}
         for sid, data in pairs(perPlayer) do
             for etype, count in pairs(data.types) do
-                ownedPoints[#ownedPoints + 1] = MakeDataPoint(count, {
-                    Attribute("player.name", data.name),
-                    Attribute("player.steam_id", sid),
-                    Attribute("entity.type", etype),
-                })
+                local attrs = GTelemetry.OTLP.PlayerAttrs(data.name, sid)
+                attrs[#attrs + 1] = Attribute("entity.type", etype)
+                ownedPoints[#ownedPoints + 1] = MakeDataPoint(count, attrs)
             end
             for class, count in pairs(data.others) do
-                ownedPoints[#ownedPoints + 1] = MakeDataPoint(count, {
-                    Attribute("player.name", data.name),
-                    Attribute("player.steam_id", sid),
-                    Attribute("entity.type", "other"),
-                    Attribute("entity.class", class),
-                })
+                local attrs = GTelemetry.OTLP.PlayerAttrs(data.name, sid)
+                attrs[#attrs + 1] = Attribute("entity.type", "other")
+                attrs[#attrs + 1] = Attribute("entity.class", class)
+                ownedPoints[#ownedPoints + 1] = MakeDataPoint(count, attrs)
             end
         end
         if #ownedPoints > 0 then

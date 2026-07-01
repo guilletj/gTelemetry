@@ -20,15 +20,9 @@ local _mapCountedThisLoad = false
 
 local MakeGauge = nil
 local MakeDataPoint = nil
-local _cachedHostname = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
 local Attribute = nil
-
--- Invalidate hostname cache when hostname changes at runtime
-cvars.AddChangeCallback("hostname", function()
-    _cachedHostname = nil
-end, "GTelemetry_Map_HostnameCache")
 
 --- Manually increment the map change counter.
 -- Used by the late-init path when InitPostEntity has already fired.
@@ -81,7 +75,7 @@ function GTelemetry.Collectors.Map.Collect()
     local currentMap = game.GetMap() or "unknown"
     local gm = gmod.GetGamemode()
     local gamemodeName = gm and gm.Name or "unknown"
-    if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
+    if not GTelemetry.OTLP._cachedHostname then GTelemetry.OTLP._cachedHostname = GetHostName and GetHostName() or "unknown" end
 
     -- Server info (always value 1, metadata carried as labels)
     metrics[#metrics + 1] = MakeGauge(

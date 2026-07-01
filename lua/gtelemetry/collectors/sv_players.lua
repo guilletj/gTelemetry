@@ -183,10 +183,7 @@ function GTelemetry.Collectors.Players.Collect(players)
                 local ping = ply:Ping()
                 totalPing = totalPing + ping
 
-                local attrs = {
-                    Attribute("player.name", playerName),
-                    Attribute("player.steam_id", steamID),
-                }
+                local attrs = GTelemetry.OTLP.PlayerAttrs(playerName, steamID)
 
                 -- Per-player ping
                 pingPoints[#pingPoints + 1] = MakeDataPoint(ping, attrs)

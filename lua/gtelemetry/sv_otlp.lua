@@ -39,17 +39,17 @@ GTelemetry.OTLP._cycleTimeNano = nil
 local _backoffAttempts = 0
 local _nextSendTime = 0
 local _maxBackoff = 30
-local _cachedGamemode = nil
-local _cachedHostname = nil
+GTelemetry.OTLP._cachedGamemode = nil
+GTelemetry.OTLP._cachedHostname = nil
 
 -- Reset gamemode cache when the gamemode changes
 hook.Add("gamemode.PostGamemodeLoaded", "GTelemetry_GamemodeCache", function()
-    _cachedGamemode = nil
+    GTelemetry.OTLP._cachedGamemode = nil
 end)
 
 -- Reset hostname cache when hostname changes at runtime
 cvars.AddChangeCallback("hostname", function()
-    _cachedHostname = nil
+    GTelemetry.OTLP._cachedHostname = nil
 end, "GTelemetry_HostnameCache")
 
 -- Reset backoff (called when endpoint ConVar changes)
@@ -104,6 +104,13 @@ function GTelemetry.OTLP.Attribute(key, value)
     end
 
     return {key = key, value = otlpValue}
+end
+
+function GTelemetry.OTLP.PlayerAttrs(name, sid)
+    return {
+        GTelemetry.OTLP.Attribute("player.name", name),
+        GTelemetry.OTLP.Attribute("player.steam_id", sid),
+    }
 end
 
 --- Create a data point for a metric.
@@ -187,13 +194,13 @@ end
 -- @param metrics table list of OTLP metric objects from collectors
 -- @return string JSON-encoded payload
 function GTelemetry.OTLP.BuildPayload(metrics)
-    if not _cachedHostname then _cachedHostname = GetHostName and GetHostName() or "unknown" end
+    if not GTelemetry.OTLP._cachedHostname then GTelemetry.OTLP._cachedHostname = GetHostName and GetHostName() or "unknown" end
     local currentMap = game.GetMap() or "unknown"
     local serviceName = GTelemetry.Config.GetServiceName()
 
-    if not _cachedGamemode then
+    if not GTelemetry.OTLP._cachedGamemode then
         local gm = gmod.GetGamemode()
-        _cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gm and gm.Name) or "unknown"
+        GTelemetry.OTLP._cachedGamemode = (engine.ActiveGamemode and engine.ActiveGamemode()) or (gm and gm.Name) or "unknown"
     end
 
     local payload = {
@@ -203,9 +210,9 @@ function GTelemetry.OTLP.BuildPayload(metrics)
                     attributes = {
                         GTelemetry.OTLP.Attribute("service.name", serviceName),
                         GTelemetry.OTLP.Attribute("service.version", GTelemetry.Version or "1.5.8"),
-                        GTelemetry.OTLP.Attribute("host.name", _cachedHostname),
+                        GTelemetry.OTLP.Attribute("host.name", GTelemetry.OTLP._cachedHostname),
                         GTelemetry.OTLP.Attribute("gmod.map", currentMap),
-                        GTelemetry.OTLP.Attribute("gmod.gamemode", _cachedGamemode),
+                        GTelemetry.OTLP.Attribute("gmod.gamemode", GTelemetry.OTLP._cachedGamemode),
                     },
                 },
                 scopeMetrics = {

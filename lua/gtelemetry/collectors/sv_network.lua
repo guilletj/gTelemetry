@@ -216,10 +216,7 @@ function GTelemetry.Collectors.Network.Collect(players)
             totalLoss = totalLoss + loss
             humanCount = humanCount + 1
             if loss > 0 then
-                lossPoints[#lossPoints + 1] = MakeDataPoint(loss, {
-                    Attribute("player.name", ply:Nick()),
-                    Attribute("player.steam_id", ply:SteamID()),
-                })
+                lossPoints[#lossPoints + 1] = MakeDataPoint(loss, GTelemetry.OTLP.PlayerAttrs(ply:Nick(), ply:SteamID()))
             end
         end
     end
