@@ -22,9 +22,8 @@ local _netDetailCount = 0  -- incremental counter for unique message names
 local _startTimeNano = nil  -- for detail counters (reset on overflow)
 local _startTimeNanoTotals = nil  -- for total counters (never reset)
 local _initialized = false
-local _cachedReceiverCount = nil
-local _lastReceiverDetailCount = 0
-local _wrappedReceivers = {}  -- { [name] = true } — message names seen by our wrapper
+local _wrappedReceivers = {}  -- { [name] = callback }
+local _netStartWrapper = nil
 
 -- Reset detail tables when they exceed this many entries to prevent unbounded growth.
 -- Cumulative counters (_netMessagesSent/_netMessagesReceived) remain accurate.
@@ -60,7 +59,7 @@ function GTelemetry.Collectors.Network.Init()
     -- This is a best-effort measurement, not byte-exact accounting.
 
     -- Wrap net.Start to count outgoing messages
-    net.Start = function(messageName, unreliable)
+    _netStartWrapper = function(messageName, unreliable)
         _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)
         if not _netMessagesSentByName[msgStr] then
@@ -69,6 +68,7 @@ function GTelemetry.Collectors.Network.Init()
         _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
         return _realNetStart(messageName, unreliable)
     end
+    net.Start = _netStartWrapper
 
     -- Track incoming messages via a hook on net.Receive registrations
     -- We increment a counter each time any net message is received
@@ -106,8 +106,6 @@ function GTelemetry.Collectors.Network.Undo()
     _startTimeNanoTotals = nil
     _initialized = false
     _netDetailCount = 0
-    _cachedReceiverCount = nil
-    _lastReceiverDetailCount = 0
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
@@ -123,7 +121,7 @@ function GTelemetry.Collectors.Network.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Network.Init() end
 
     -- Failsafe: if another addon overwrote our wrappers, restore and stop counting
-    if _initialized and net.Start ~= _realNetStart then
+    if _initialized and net.Start ~= _netStartWrapper then
         GTelemetry.Warn("Network collector: net.Start was overwritten externally — restoring originals")
         GTelemetry.Collectors.Network.Undo()
         return {}
@@ -194,20 +192,17 @@ function GTelemetry.Collectors.Network.Collect(players)
         end
     end
 
-    -- Active Net Receivers (cached between cycles)
+    -- Active Net Receivers (refreshed every cycle — iteration is cheap)
     if net.Receivers then
-        if not _cachedReceiverCount or _netDetailCount ~= _lastReceiverDetailCount then
-            _cachedReceiverCount = 0
-            for _, _ in pairs(net.Receivers) do
-                _cachedReceiverCount = _cachedReceiverCount + 1
-            end
-            _lastReceiverDetailCount = _netDetailCount
+        local receiverCount = 0
+        for _, _ in pairs(net.Receivers) do
+            receiverCount = receiverCount + 1
         end
         metrics[#metrics + 1] = MakeGauge(
             "gmod.network.active_receivers",
             "Total number of registered net message receivers",
             "{receivers}",
-            {MakeDataPoint(_cachedReceiverCount)}
+            {MakeDataPoint(receiverCount)}
         )
     end
 

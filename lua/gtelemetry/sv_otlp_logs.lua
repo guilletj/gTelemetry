@@ -46,7 +46,6 @@ local function _reinsertRecords(records)
     if not records or #records == 0 then return end
     local failedCount = #records
     local snapStart = _flushSnapshot.start
-    local snapSize = _flushSnapshot.size
     local currentStart = _bufferStart
     local currentSize = _bufferSize
     local maxSize = GTelemetry.Config.GetLogBufferSize()
