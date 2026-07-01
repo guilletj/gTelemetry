@@ -154,10 +154,9 @@ local _hookSpecs = {
         if not IsValid(ply) then return end
         AddLog(SEVERITY_INFO, "INFO", ply:Nick() .. " exited " .. (IsValid(vehicle) and vehicle:GetClass() or "unknown"), {Attribute("log.source", "vehicle"), Attribute("log.event", "exit")})
     end},
-    {event = "OnLuaError", id = "GTelemetry_BLogs_error", fn = function(error, realm, stack, name)
-        local source = name and "[" .. name .. "]" or ""
-        local body = source .. " " .. tostring(error)
-        if stack then body = body .. "\n" .. tostring(stack) end
+    {event = "OnLuaError", id = "GTelemetry_BLogs_error", fn = function(error, stacktrace, realm)
+        local body = tostring(error)
+        if stacktrace then body = body .. "\n" .. tostring(stacktrace) end
         AddLog(SEVERITY_ERROR, "ERROR", body, {Attribute("log.source", "error"), Attribute("log.realm", realm or "SERVER")})
     end},
     {event = "ULibCommandCalled", id = "GTelemetry_BLogs_ulx", fn = function(ply, cmd, args)

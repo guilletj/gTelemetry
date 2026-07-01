@@ -54,9 +54,11 @@ local _allTypes = {
 -- Class cache: class names never change, so cache classification results.
 -- Normal table is fine (<200 unique classes per map).
 local _classCache = {}
+local _noPhysicsCache = {}  -- classes confirmed to have no physics object
 
--- Non-physics prefix pattern. 'p' and 's' prefixes disambiguated in EntityHasPhysics
--- (prop_/sent_ have physics, point_/path_/scene_/shadow_/sprite_ don't).
+-- Non-physics prefix pattern. Covers env_, info_, ai_, logic_, item_, math_, light_, trigger_.
+-- 'p' and 's' prefixes are disambiguated in EntityHasPhysics (prop_/sent_ have physics,
+-- point_/path_/scene_/shadow_/sprite_ don't).
 local _physicsNoMatch = "^[aeilmt]"
 
 --- Classify an entity into a numeric type. Results cached by class string.
@@ -130,6 +132,7 @@ function GTelemetry.Collectors.Entities.Undo()
     Attribute = nil
     _cycleCount = 0
     _classCache = {}
+    _noPhysicsCache = {}
 end
 
 --- Collect entity count metrics.
@@ -170,9 +173,13 @@ function GTelemetry.Collectors.Entities.Collect()
 
             -- Physics objects (only check classes that can have physics)
             if EntityHasPhysics(class) then
-                local ok, phys = pcall(ent.GetPhysicsObject, ent)
-                if ok and IsValid(phys) then
-                    physicsCount = physicsCount + 1
+                if not _noPhysicsCache[class] then
+                    local ok, phys = pcall(ent.GetPhysicsObject, ent)
+                    if ok and IsValid(phys) then
+                        physicsCount = physicsCount + 1
+                    else
+                        _noPhysicsCache[class] = true
+                    end
                 end
             end
 

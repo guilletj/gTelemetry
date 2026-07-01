@@ -19,7 +19,8 @@ local _netMessagesReceived = 0
 local _netMessagesSentByName = {}
 local _netMessagesReceivedByName = {}
 local _netDetailCount = 0  -- incremental counter for unique message names
-local _startTimeNano = nil
+local _startTimeNano = nil  -- for detail counters (reset on overflow)
+local _startTimeNanoTotals = nil  -- for total counters (never reset)
 local _initialized = false
 local _cachedReceiverCount = nil
 local _lastReceiverDetailCount = 0
@@ -49,6 +50,7 @@ function GTelemetry.Collectors.Network.Init()
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
     Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
+    _startTimeNanoTotals = _startTimeNano
 
     -- NOTE: These wrappers permanently override net.Start/net.Receive globally.
     -- Pre-existing net.Receive registrations (before this Init) are NOT counted.
@@ -93,6 +95,7 @@ function GTelemetry.Collectors.Network.Undo()
     _netMessagesSentByName = {}
     _netMessagesReceivedByName = {}
     _startTimeNano = nil
+    _startTimeNanoTotals = nil
     _initialized = false
     _netDetailCount = 0
     _cachedReceiverCount = nil
@@ -125,7 +128,7 @@ function GTelemetry.Collectors.Network.Collect(players)
         "gmod.network.net_messages_out",
         "Total net library messages sent by the server",
         "{messages}",
-        {MakeCumulativeDataPoint(_netMessagesSent, _startTimeNano)},
+        {MakeCumulativeDataPoint(_netMessagesSent, _startTimeNanoTotals)},
         true
     )
 
@@ -134,7 +137,7 @@ function GTelemetry.Collectors.Network.Collect(players)
         "gmod.network.net_messages_in",
         "Total net library messages received by the server",
         "{messages}",
-        {MakeCumulativeDataPoint(_netMessagesReceived, _startTimeNano)},
+        {MakeCumulativeDataPoint(_netMessagesReceived, _startTimeNanoTotals)},
         true
     )
 

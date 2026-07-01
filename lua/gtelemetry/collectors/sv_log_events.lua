@@ -160,11 +160,10 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- ════════════════════════════════════════════════════════════
     -- Lua errors
     -- ════════════════════════════════════════════════════════════
-    hook.Add("OnLuaError", "GTelemetry_LogError", function(error, realm, stack, name)
-        local source = name and "[" .. name .. "]" or ""
-        local body = source .. " " .. tostring(error)
-        if stack then
-            body = body .. "\n" .. tostring(stack)
+    hook.Add("OnLuaError", "GTelemetry_LogError", function(error, stacktrace, realm)
+        local body = tostring(error)
+        if stacktrace then
+            body = body .. "\n" .. tostring(stacktrace)
         end
         AddLog(SEVERITY_ERROR, "ERROR", body, {
             Attribute("log.source", "error"),
@@ -371,7 +370,7 @@ function GTelemetry.Collectors.LogEvents.Init()
                 Attribute("log.source", "system"),
                 Attribute("log.event", "server_start"),
             })
-        else
+        elseif _prevMap ~= currentMap then
             local body = "Map changed: " .. _prevMap .. " -> " .. currentMap
             AddLog(SEVERITY_INFO, "INFO", body, {
                 Attribute("log.source", "system"),

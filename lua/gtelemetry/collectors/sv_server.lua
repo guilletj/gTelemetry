@@ -62,7 +62,7 @@ function GTelemetry.Collectors.Server.Collect()
             "gmod.server.tickrate",
             "Configured server tick rate",
             "Hz",
-            {MakeDataPoint(math_Round(1 / tickInterval))}
+            {MakeDataPoint(1 / tickInterval)}
         )
     end
 

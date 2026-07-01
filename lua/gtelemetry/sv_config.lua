@@ -31,7 +31,7 @@ function GTelemetry.Util.safeConcat(t, sep)
     local len = 0
     for _, v in ipairs(t) do
         local s = tostring(v)
-        if len + #s > maxLen then
+        if len + #s >= maxLen then
             parts[#parts + 1] = s:sub(1, maxLen - len) .. "..."
             break
         end
@@ -387,7 +387,7 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         end
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Undo then
-                local ok, err = pcall(collector.Undo)
+                local ok, err = pcall(function() collector:Undo() end)
                 if not ok then
                     GTelemetry.Warn("Collector '" .. tostring(name) .. "' Undo failed: " .. tostring(err))
                 end

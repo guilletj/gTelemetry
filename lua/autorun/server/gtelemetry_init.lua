@@ -196,7 +196,7 @@ end
 hook.Add("ShutDown", "GTelemetry_Shutdown", function()
     -- Restore original net wrappers first so other addons' shutdown hooks work cleanly
     if GTelemetry.Collectors.Network and GTelemetry.Collectors.Network.Undo then
-        pcall(GTelemetry.Collectors.Network.Undo)
+        pcall(function() GTelemetry.Collectors.Network:Undo() end)
     end
 
     -- Attempt one final metrics push before shutting down.
@@ -205,7 +205,7 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
     -- Wrap in pcall in case engine state is partially torn down.
     if GTelemetry.Config.IsEnabled() then
         GTelemetry.Debug("Server shutting down, sending final metrics...")
-        local ok, err = pcall(GTelemetry.OTLP.CollectAndSend)
+        local ok, err = pcall(function() GTelemetry.OTLP:CollectAndSend() end)
         if not ok then
             GTelemetry.Warn("Final metrics send failed: " .. tostring(err))
         end
@@ -213,7 +213,7 @@ hook.Add("ShutDown", "GTelemetry_Shutdown", function()
 
     if GTelemetry.Config.IsLogEnabled() and GTelemetry.OTLP.Logs then
         GTelemetry.Debug("Server shutting down, flushing logs...")
-        local ok, err = pcall(GTelemetry.OTLP.Logs.Flush)
+        local ok, err = pcall(function() GTelemetry.OTLP.Logs:Flush() end)
         if not ok then
             GTelemetry.Warn("Final log flush failed: " .. tostring(err))
         end
