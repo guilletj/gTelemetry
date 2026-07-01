@@ -63,6 +63,7 @@ function GTelemetry.Collectors.Map.Undo()
     hook.Remove("InitPostEntity", "GTelemetry_MapInit")
     _startTimeNano = nil
     _mapChangesAtInit = 0
+    _mapCountedThisLoad = false
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil

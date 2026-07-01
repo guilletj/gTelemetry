@@ -340,7 +340,9 @@ cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
         interval = 300
     end
 
-    GTelemetry.Config.ConVars.interval:SetInt(interval)
+    if interval ~= tonumber(newVal) then
+        GTelemetry.Config.ConVars.interval:SetInt(interval)
+    end
 
     if timer.Exists("GTelemetry_Collect") then
         timer.Adjust("GTelemetry_Collect", interval)
@@ -469,6 +471,10 @@ cvars.AddChangeCallback("gtelemetry_log_interval", function(_, _, newVal)
     elseif interval > 300 then
         GTelemetry.Warn("gtelemetry_log_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
         interval = 300
+    end
+
+    if interval ~= tonumber(newVal) then
+        GTelemetry.Config.ConVars.log_interval:SetInt(interval)
     end
 
     if timer.Exists("GTelemetry_LogFlush") then

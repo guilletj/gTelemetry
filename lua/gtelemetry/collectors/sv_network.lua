@@ -75,7 +75,7 @@ function GTelemetry.Collectors.Network.Init()
     -- Track wrapped names so Undo() can replace them with no-ops.
     net.Receive = function(messageName, callback)
         local msgStr = tostring(messageName)
-        _wrappedReceivers[msgStr] = true
+        _wrappedReceivers[msgStr] = callback
         return _realNetReceive(messageName, function(len, ply)
             _netMessagesReceived = _netMessagesReceived + 1
             if not _netMessagesReceivedByName[msgStr] then
@@ -93,9 +93,9 @@ end
 function GTelemetry.Collectors.Network.Undo()
     net.Start = _realNetStart
     net.Receive = _realNetReceive
-    -- Replace our counting wrappers with no-ops to stop counting
-    for name, _ in pairs(_wrappedReceivers) do
-        _realNetReceive(name, function() end)
+    -- Restore original callbacks
+    for name, cb in pairs(_wrappedReceivers) do
+        _realNetReceive(name, cb)
     end
     _wrappedReceivers = {}
     _netMessagesSent = 0

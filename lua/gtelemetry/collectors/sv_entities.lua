@@ -237,16 +237,20 @@ function GTelemetry.Collectors.Entities.Collect()
     -- Breakdown by type + owner
     local ownerBreakdownPoints = {}
     for etype, count in pairs(worldTypeCounts) do
-        ownerBreakdownPoints[#ownerBreakdownPoints + 1] = MakeDataPoint(count, {
-            Attribute("entity.type", TypeName(etype)),
-            Attribute("entity.owner", "world"),
-        })
+        if count > 0 then
+            ownerBreakdownPoints[#ownerBreakdownPoints + 1] = MakeDataPoint(count, {
+                Attribute("entity.type", TypeName(etype)),
+                Attribute("entity.owner", "world"),
+            })
+        end
     end
     for etype, count in pairs(playerTypeCounts) do
-        ownerBreakdownPoints[#ownerBreakdownPoints + 1] = MakeDataPoint(count, {
-            Attribute("entity.type", TypeName(etype)),
-            Attribute("entity.owner", "player"),
-        })
+        if count > 0 then
+            ownerBreakdownPoints[#ownerBreakdownPoints + 1] = MakeDataPoint(count, {
+                Attribute("entity.type", TypeName(etype)),
+                Attribute("entity.owner", "player"),
+            })
+        end
     end
     if #ownerBreakdownPoints > 0 then
         metrics[#metrics + 1] = MakeGauge(

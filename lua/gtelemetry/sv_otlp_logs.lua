@@ -35,6 +35,7 @@ local _backoffAttempts = 0
 local _nextSendTime = 0
 local _maxBackoff = 30
 local _isFlushing = false
+local _stopped = false
 local _cachedGamemode = nil
 local _cachedHostname = nil
 
@@ -81,18 +82,20 @@ end
 function GTelemetry.OTLP.Logs.Init()
     if _initialized then return end
     _initialized = true
+    _stopped = false
 end
 
 --- Add a log entry to the buffer.
 function GTelemetry.OTLP.Logs.AddLog(severityNumber, severityText, body, attributes)
     if not _initialized then GTelemetry.OTLP.Logs.Init() end
 
+    body = tostring(body)
     local maxBodyLen = 16384
     if #body > maxBodyLen then
         body = body:sub(1, maxBodyLen):gsub("[\128-\191]$", "") .. "..."
         GTelemetry.OTLP.Logs.TruncatedLogs = GTelemetry.OTLP.Logs.TruncatedLogs + 1
     end
-    body = tostring(body):gsub("[\000-\008\011\012\014-\031\127]", "")
+    body = body:gsub("[\000-\008\011\012\014-\031\127]", "")
 
     local record = {
         timeUnixNano = GTelemetry.OTLP.GetTimeNano(),
@@ -193,7 +196,7 @@ function GTelemetry.OTLP.Logs.Send(jsonBody, recordsToRetry)
                 _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
                 GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
                 GTelemetry.Warn("Failed to send logs: " .. errMsg)
-                if timer.Exists("GTelemetry_LogFlush") and flushGen == _logGeneration then
+                if not _stopped and flushGen == _logGeneration then
                     _reinsertRecords(recordsToRetry)
                 end
             end)
@@ -246,6 +249,7 @@ end
 
 --- Clear buffer without sending.
 function GTelemetry.OTLP.Logs.ClearBuffer()
+    _stopped = true
     _logGeneration = _logGeneration + 1
     _logBuffer = {}
     _bufferStart = 1

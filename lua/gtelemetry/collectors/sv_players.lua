@@ -69,6 +69,7 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     local data = _playerData[steamID]
     if not data.loadTime or data.loadTime == -1 then
         data.loadTime = math_Round(SysTime() - data.loadStart, 2)
+        if data.loadTime < 0.1 then data.loadTime = nil end
     end
 end)
 

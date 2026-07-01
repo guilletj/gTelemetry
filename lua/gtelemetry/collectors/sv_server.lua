@@ -108,12 +108,13 @@ function GTelemetry.Collectors.Server.Collect()
     )
 
     -- Lua memory usage (in bytes)
-    local luaMemoryKB = collectgarbage("count")
+    local kbytes, bytes = collectgarbage("count")
+    local luaMemoryBytes = math_floor(kbytes * 1024 + (bytes or 0))
     metrics[#metrics + 1] = MakeGauge(
         "gmod.server.lua_memory",
         "Lua state memory usage",
         "By",
-        {MakeDataPoint(math_floor(luaMemoryKB * 1024))}
+        {MakeDataPoint(luaMemoryBytes)}
     )
 
     -- Server uptime

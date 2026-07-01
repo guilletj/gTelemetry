@@ -47,8 +47,6 @@ function GTelemetry.Collectors.BLogs.Init()
         return
     end
 
-    _initialized = true
-
     AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
 
@@ -59,6 +57,8 @@ function GTelemetry.Collectors.BLogs.Init()
     if not validModes[mode] then
         GTelemetry.Warn("Unknown gtelemetry_log_blogs_mode '" .. tostring(mode) .. "', treating as 'off'")
     end
+
+    _initialized = true
 
     if mode == "replace" or mode == "hybrid" then
         _setupModule()
