@@ -20,6 +20,7 @@ local _playerData = {} -- [SteamID] = { fps, kills, deaths, connectTime, loadSta
 local _startTimeNano = nil
 local _initialized = false
 local _clientLoadTimeout = 120 -- seconds before marking a missing ClientReady as timed out
+local _lastMsgTime = {} -- [SteamID] = SysTime() — rate-limit guard
 local math_Round = math.Round
 
 local MakeGauge = nil
@@ -33,10 +34,18 @@ util.AddNetworkString("GTelemetry_ClientData")
 util.AddNetworkString("GTelemetry_ClientReady")
 util.AddNetworkString("GTelemetry_RequestReady")
 
+local function _rateLimit(steamID)
+    local now = SysTime()
+    if now - (_lastMsgTime[steamID] or 0) < 1 then return true end
+    _lastMsgTime[steamID] = now
+    return false
+end
+
 net.Receive("GTelemetry_ClientData", function(len, ply)
     if not IsValid(ply) then return end
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
+    if _rateLimit(steamID) then return end
     if not _playerData[steamID] then
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
@@ -53,6 +62,7 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     if not IsValid(ply) then return end
     if ply:IsBot() then return end
     local steamID = ply:SteamID()
+    if _rateLimit(steamID) then return end
     if not _playerData[steamID] then
         _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
     end
@@ -65,7 +75,9 @@ end)
 -- Clean up player data on disconnect (module level — persists across enable/disable)
 hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
     if not IsValid(ply) then return end
-    _playerData[ply:SteamID()] = nil
+    local sid = ply:SteamID()
+    _playerData[sid] = nil
+    _lastMsgTime[sid] = nil
 end)
 
 --- Initialize references and hooks.

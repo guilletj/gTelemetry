@@ -80,6 +80,13 @@ end
 function GTelemetry.OTLP.Logs.AddLog(severityNumber, severityText, body, attributes)
     if not _initialized then GTelemetry.OTLP.Logs.Init() end
 
+    local maxBodyLen = 16384
+    if #body > maxBodyLen then
+        body = body:sub(1, maxBodyLen) .. "..."
+        GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + 1
+    end
+    body = tostring(body):gsub("[\000-\008\011\012\014-\031\127]", "")
+
     local record = {
         timeUnixNano = GTelemetry.OTLP.GetTimeNano(),
         severityNumber = severityNumber,

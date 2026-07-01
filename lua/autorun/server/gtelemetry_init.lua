@@ -33,7 +33,7 @@ function GTelemetry.PrintBanner()
 
         MsgC(cyan, "\n==================================================\n")
         MsgC(cyan, "[gTelemetry] ", purple, "GMod Telemetry (v" .. GTelemetry.Version .. ")\n")
-        MsgC(white, "Desarrollado por: ", yellow, "Edyone ", white, "para ", cyan, "Alienhost\n")
+        MsgC(white, "Developed by: ", yellow, "Edyone ", white, "for ", cyan, "Alienhost\n")
         MsgC(gray, "--------------------------------------------------\n")
         MsgC(white, "[WEB]     ", cyan, "https://alienhost.es/\n")
         MsgC(white, "[DISCORD] ", cyan, "@edyone\n")
@@ -43,7 +43,7 @@ function GTelemetry.PrintBanner()
         local sep = string.rep("=", 50)
         print(sep)
         print("[gTelemetry] GMod Telemetry (v" .. GTelemetry.Version .. ")")
-        print("Desarrollado por: Edyone para Alienhost")
+        print("Developed by Edyone for Alienhost")
         print(sep)
     end
 end
@@ -194,6 +194,11 @@ end
 
 -- Clean shutdown
 hook.Add("ShutDown", "GTelemetry_Shutdown", function()
+    -- Restore original net wrappers first so other addons' shutdown hooks work cleanly
+    if GTelemetry.Collectors.Network and GTelemetry.Collectors.Network.Undo then
+        pcall(GTelemetry.Collectors.Network.Undo)
+    end
+
     -- Attempt one final metrics push before shutting down.
     -- NOTE: HTTP() is asynchronous; the server may close before the
     -- request completes, causing the final payload to be lost.

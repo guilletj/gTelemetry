@@ -15,6 +15,7 @@ GTelemetry.Collectors = GTelemetry.Collectors or {}
 GTelemetry.Collectors.BLogs = {}
 
 local _initialized = false
+local _initMode = nil
 local _module = nil
 local _modulePrevMap = nil
 local _serverStartLogged = false
@@ -51,7 +52,8 @@ function GTelemetry.Collectors.BLogs.Init()
     AddLog = GTelemetry.OTLP.Logs.AddLog
     Attribute = GTelemetry.OTLP.Attribute
 
-    local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+    _initMode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+    local mode = _initMode
 
     local validModes = {off = true, replace = true, intercept = true, hybrid = true}
     if not validModes[mode] then
@@ -80,7 +82,7 @@ function GTelemetry.Collectors.BLogs.Undo()
     if not _initialized then return end
     _initialized = false
 
-    local mode = GTelemetry.Config.ConVars.log_blogs_mode:GetString()
+    local mode = _initMode
 
     if mode == "replace" or mode == "hybrid" then
         _cleanupModule()
@@ -91,6 +93,7 @@ function GTelemetry.Collectors.BLogs.Undo()
     end
 
     _module = nil
+    _initMode = nil
     GTelemetry.OTLP.Logs.ClearBuffer()
     GTelemetry.Debug("bLogs bridge stopped")
 end

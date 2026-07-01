@@ -19,11 +19,24 @@ local string_match = string.match
 -- Shared utilities
 GTelemetry.Util = GTelemetry.Util or {}
 
+function GTelemetry.Util.sanitize(s)
+    if not s then return "" end
+    return s:gsub("[%c]", ""):gsub("[\194\128-\194\159]", "")
+end
+
 function GTelemetry.Util.safeConcat(t, sep)
     if not t then return "" end
     local parts = {}
+    local maxLen = 4096
+    local len = 0
     for _, v in ipairs(t) do
-        parts[#parts + 1] = tostring(v)
+        local s = tostring(v)
+        if len + #s > maxLen then
+            parts[#parts + 1] = s:sub(1, maxLen - len) .. "..."
+            break
+        end
+        parts[#parts + 1] = s
+        len = len + #s
     end
     return table_concat(parts, sep or " ")
 end
@@ -97,11 +110,11 @@ GTelemetry.Config.ConVars = {
         0, 1
     ),
 
-    version = CreateConVar(
+    version = not ConVarExists("gtelemetry_version") and CreateConVar(
         "gtelemetry_version", GTelemetry.Version or "1.5.8",
-        FCVAR_ARCHIVE + FCVAR_NOTIFY + FCVAR_REPLICATED,
+        FCVAR_ARCHIVE + FCVAR_NOTIFY,
         "Version of gTelemetry currently running."
-    ),
+    ) or GetConVar("gtelemetry_version"),
 
     -- Log / Loki ConVars
     log_enabled = CreateConVar(
@@ -151,6 +164,14 @@ function GTelemetry.Config.IsEnabled()
     return GTelemetry.Config.ConVars.enabled:GetBool()
 end
 
+local function _warnIfPrivateIP(url)
+    local host = string_match(url, "^https?://([^:/]+)")
+    if not host then return end
+    if string_match(host, "^10%.") or string_match(host, "^172%.(1[6-9]|2[0-9]|3[01])%.") or string_match(host, "^192%.168%.") then
+        GTelemetry.Warn("Endpoint points to a private IP (" .. host .. ") — confirm this is intentional")
+    end
+end
+
 --- Returns the OTLP endpoint URL.
 -- @return string
 function GTelemetry.Config.GetEndpoint()
@@ -161,6 +182,7 @@ function GTelemetry.Config.GetEndpoint()
         GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
         url = ""
     end
+    if url ~= "" then _warnIfPrivateIP(url) end
     return url
 end
 
@@ -230,6 +252,7 @@ function GTelemetry.Config.GetLogEndpoint()
         GTelemetry.Warn("Invalid log endpoint URL (must start with http:// or https://): " .. url)
         url = ""
     end
+    if url ~= "" then _warnIfPrivateIP(url) end
     return url
 end
 
@@ -421,10 +444,12 @@ cvars.AddChangeCallback("gtelemetry_log_endpoint", function()
 end, "gtelemetry_log_endpoint_change")
 
 -- Listen for bLogs mode changes
-cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(_, _, newVal)
+cvars.AddChangeCallback("gtelemetry_log_blogs_mode", function(convarName, oldVal, newVal)
     local valid = {off = true, replace = true, intercept = true, hybrid = true}
     if not valid[newVal] then
-        GTelemetry.Warn("Invalid gtelemetry_log_blogs_mode value: " .. tostring(newVal) .. ". Valid: off, replace, intercept, hybrid")
+        GTelemetry.Warn("Invalid gtelemetry_log_blogs_mode value: " .. tostring(newVal) .. ". Reverting to '" .. tostring(oldVal) .. "'. Valid: off, replace, intercept, hybrid")
+        GTelemetry.Config.ConVars.log_blogs_mode:SetString(oldVal)
+        return
     end
     GTelemetry.Log("bLogs integration mode changed to: " .. tostring(newVal) .. " — toggle gtelemetry_log_enabled to apply (in-flight logs will be flushed)")
 end, "gtelemetry_log_blogs_mode_change")

@@ -21,6 +21,8 @@ local _netMessagesReceivedByName = {}
 local _netDetailCount = 0  -- incremental counter for unique message names
 local _startTimeNano = nil
 local _initialized = false
+local _cachedReceiverCount = nil
+local _lastReceiverDetailCount = 0
 
 -- Reset detail tables when they exceed this many entries to prevent unbounded growth.
 -- Cumulative counters (_netMessagesSent/_netMessagesReceived) remain accurate.
@@ -93,6 +95,8 @@ function GTelemetry.Collectors.Network.Undo()
     _startTimeNano = nil
     _initialized = false
     _netDetailCount = 0
+    _cachedReceiverCount = nil
+    _lastReceiverDetailCount = 0
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
@@ -106,6 +110,13 @@ end
 -- @return table list of OTLP metric objects
 function GTelemetry.Collectors.Network.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Network.Init() end
+
+    -- Failsafe: if another addon overwrote our wrappers, restore and stop counting
+    if _initialized and net.Start ~= _realNetStart then
+        GTelemetry.Warn("Network collector: net.Start was overwritten externally — restoring originals")
+        GTelemetry.Collectors.Network.Undo()
+        return {}
+    end
 
     local metrics = {}
 
@@ -172,17 +183,20 @@ function GTelemetry.Collectors.Network.Collect(players)
         end
     end
 
-    -- Active Net Receivers
+    -- Active Net Receivers (cached between cycles)
     if net.Receivers then
-        local activeReceivers = 0
-        for _, _ in pairs(net.Receivers) do
-            activeReceivers = activeReceivers + 1
+        if not _cachedReceiverCount or _netDetailCount ~= _lastReceiverDetailCount then
+            _cachedReceiverCount = 0
+            for _, _ in pairs(net.Receivers) do
+                _cachedReceiverCount = _cachedReceiverCount + 1
+            end
+            _lastReceiverDetailCount = _netDetailCount
         end
         metrics[#metrics + 1] = MakeGauge(
             "gmod.network.active_receivers",
             "Total number of registered net message receivers",
             "{receivers}",
-            {MakeDataPoint(activeReceivers)}
+            {MakeDataPoint(_cachedReceiverCount)}
         )
     end
 

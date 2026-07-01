@@ -249,6 +249,7 @@ function GTelemetry.OTLP._DoHTTPPost(endpoint, body, callbacks)
         headers = headers,
         body = body,
         type = "application/json",
+        timeout = 10,
 
         success = function(code, respBody)
             if code >= 200 and code < 300 then
