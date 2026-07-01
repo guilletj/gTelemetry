@@ -191,7 +191,8 @@ function GTelemetry.Collectors.Entities.Collect()
                 okOwner, owner = pcall(cppiFn, ent)
             end
             if not okOwner or not IsValid(owner) then
-                owner = ent.GetCreator and ent:GetCreator()
+                local okCreator, creator = pcall(ent.GetCreator, ent)
+                if okCreator then owner = creator end
             end
 
             local isPlayerOwned = IsValid(owner) and owner:IsPlayer()

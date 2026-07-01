@@ -25,9 +25,11 @@ local _bufferSize = 0
 local _bufferStart = 1
 local _initialized = false
 local _logGeneration = 0
+local _flushSnapshot = {}  -- { start, size } captured at flush extraction
 
 GTelemetry.OTLP.Logs.SendFailures = 0
 GTelemetry.OTLP.Logs.DroppedLogs = 0
+GTelemetry.OTLP.Logs.TruncatedLogs = 0
 
 local _backoffAttempts = 0
 local _nextSendTime = 0
@@ -36,22 +38,27 @@ local _isFlushing = false
 local _cachedGamemode = nil
 local _cachedHostname = nil
 
---- Prepend records to buffer, preserving new records added after flush.
+--- Prepend records to buffer, using the snapshot captured at flush extraction.
+-- This ensures correct buffer positioning even if AddLog ran between extraction
+-- and reinsertion (e.g., from an async HTTP callback).
 local function _reinsertRecords(records)
     if not records or #records == 0 then return end
     local failedCount = #records
+    local snapStart = _flushSnapshot.start
+    local snapSize = _flushSnapshot.size
     local currentStart = _bufferStart
     local currentSize = _bufferSize
     local maxSize = GTelemetry.Config.GetLogBufferSize()
     local toInsert = math.min(failedCount, maxSize - currentSize)
+    -- Shift existing records (added after flush) to make room at snapshot position
     for i = currentSize, 1, -1 do
-        _logBuffer[currentStart + toInsert + i - 1] = _logBuffer[currentStart + i - 1]
+        _logBuffer[snapStart + toInsert + i - 1] = _logBuffer[currentStart + i - 1]
         _logBuffer[currentStart + i - 1] = nil
     end
     for i = 1, toInsert do
-        _logBuffer[currentStart + i - 1] = records[i]
+        _logBuffer[snapStart + i - 1] = records[i]
     end
-    _bufferStart = currentStart
+    _bufferStart = snapStart
     _bufferSize = currentSize + toInsert
     if toInsert < failedCount then
         GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + (failedCount - toInsert)
@@ -82,8 +89,8 @@ function GTelemetry.OTLP.Logs.AddLog(severityNumber, severityText, body, attribu
 
     local maxBodyLen = 16384
     if #body > maxBodyLen then
-        body = body:sub(1, maxBodyLen) .. "..."
-        GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + 1
+        body = body:sub(1, maxBodyLen):gsub("[\128-\191]$", "") .. "..."
+        GTelemetry.OTLP.Logs.TruncatedLogs = GTelemetry.OTLP.Logs.TruncatedLogs + 1
     end
     body = tostring(body):gsub("[\000-\008\011\012\014-\031\127]", "")
 
@@ -207,6 +214,8 @@ function GTelemetry.OTLP.Logs.Flush()
 
     _logGeneration = _logGeneration + 1
     local records = {}
+    _flushSnapshot.start = _bufferStart
+    _flushSnapshot.size = _bufferSize
     for i = 0, _bufferSize - 1 do
         records[i + 1] = _logBuffer[_bufferStart + i]
         _logBuffer[_bufferStart + i] = nil
@@ -214,6 +223,7 @@ function GTelemetry.OTLP.Logs.Flush()
     _bufferStart = 1
     _bufferSize = 0
 
+    local flushGen = _logGeneration
     local success, result = pcall(function()
         local jsonBody = GTelemetry.OTLP.Logs.BuildPayload(records)
         return GTelemetry.OTLP.Logs.Send(jsonBody, records)
@@ -221,12 +231,12 @@ function GTelemetry.OTLP.Logs.Flush()
 
     if not success then
         GTelemetry.Warn("Log flush failed: " .. tostring(result))
-        if timer.Exists("GTelemetry_LogFlush") then
+        if timer.Exists("GTelemetry_LogFlush") and flushGen == _logGeneration then
             _reinsertRecords(records)
         end
     elseif not result then
         GTelemetry.Debug("Log flush skipped (backoff active), re-inserting " .. #records .. " records")
-        if timer.Exists("GTelemetry_LogFlush") then
+        if timer.Exists("GTelemetry_LogFlush") and flushGen == _logGeneration then
             _reinsertRecords(records)
         end
     end

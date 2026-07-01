@@ -24,6 +24,7 @@ local _startTimeNanoTotals = nil  -- for total counters (never reset)
 local _initialized = false
 local _cachedReceiverCount = nil
 local _lastReceiverDetailCount = 0
+local _wrappedReceivers = {}  -- { [name] = true } — message names seen by our wrapper
 
 -- Reset detail tables when they exceed this many entries to prevent unbounded growth.
 -- Cumulative counters (_netMessagesSent/_netMessagesReceived) remain accurate.
@@ -71,8 +72,10 @@ function GTelemetry.Collectors.Network.Init()
 
     -- Track incoming messages via a hook on net.Receive registrations
     -- We increment a counter each time any net message is received
+    -- Track wrapped names so Undo() can replace them with no-ops.
     net.Receive = function(messageName, callback)
         local msgStr = tostring(messageName)
+        _wrappedReceivers[msgStr] = true
         return _realNetReceive(messageName, function(len, ply)
             _netMessagesReceived = _netMessagesReceived + 1
             if not _netMessagesReceivedByName[msgStr] then
@@ -90,6 +93,11 @@ end
 function GTelemetry.Collectors.Network.Undo()
     net.Start = _realNetStart
     net.Receive = _realNetReceive
+    -- Replace our counting wrappers with no-ops to stop counting
+    for name, _ in pairs(_wrappedReceivers) do
+        _realNetReceive(name, function() end)
+    end
+    _wrappedReceivers = {}
     _netMessagesSent = 0
     _netMessagesReceived = 0
     _netMessagesSentByName = {}

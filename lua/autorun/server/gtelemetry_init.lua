@@ -88,6 +88,15 @@ end
 --- Start (or restart) the log flush timer.
 function GTelemetry.StartLogCollection()
     if not GTelemetry.Config.IsLogEnabled() then return end
+    if timer.Exists("GTelemetry_LogFlush") then
+        GTelemetry.Debug("Log flush timer already active")
+        return
+    end
+
+    if not GTelemetry.OTLP.Logs then
+        GTelemetry.Warn("GTelemetry.OTLP.Logs not available — log flush timer not created")
+        return
+    end
 
     if GTelemetry.Config.IsBlogsActive() and GTelemetry.Config.IsBlogsAvailable() then
         if GTelemetry.Collectors.BLogs and GTelemetry.Collectors.BLogs.Init then
@@ -97,16 +106,6 @@ function GTelemetry.StartLogCollection()
     else
         GTelemetry.Collectors.LogEvents.Init()
         GTelemetry._activeLogCollector = "logevents"
-    end
-
-    if not GTelemetry.OTLP.Logs then
-        GTelemetry.Warn("GTelemetry.OTLP.Logs not available — log flush timer not created")
-        return
-    end
-
-    if timer.Exists("GTelemetry_LogFlush") then
-        GTelemetry.Debug("Log flush timer already active")
-        return
     end
 
     local interval = GTelemetry.Config.GetLogInterval()

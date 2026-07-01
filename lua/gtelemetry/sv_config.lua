@@ -340,6 +340,8 @@ cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
         interval = 300
     end
 
+    GTelemetry.Config.ConVars.interval:SetInt(interval)
+
     if timer.Exists("GTelemetry_Collect") then
         timer.Adjust("GTelemetry_Collect", interval)
         GTelemetry.Log("Collection interval changed to " .. interval .. "s")

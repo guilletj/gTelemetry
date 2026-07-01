@@ -324,7 +324,7 @@ function GTelemetry.Collectors.BLogs.Interceptor.Install()
             return false
         end
 
-        _origLogPhrase = target[key]
+        _origLogPhrase = rawget(target, key)
         _restoreTarget = target
         _restoreKey = key
 
