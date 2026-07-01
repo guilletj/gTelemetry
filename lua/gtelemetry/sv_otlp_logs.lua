@@ -15,8 +15,6 @@ GTelemetry.OTLP.Logs = GTelemetry.OTLP.Logs or {}
 local util_TableToJSON = util.TableToJSON
 local SysTime = SysTime
 local tostring = tostring
-local table_insert = table.insert
-local pairs = pairs
 local math_min = math.min
 local math_ceil = math.ceil
 

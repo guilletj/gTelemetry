@@ -85,7 +85,7 @@ function GTelemetry.Collectors.Map.Collect()
         {MakeDataPoint(1, {
             Attribute("server.map", currentMap),
             Attribute("server.gamemode", gamemodeName),
-            Attribute("server.hostname", _cachedHostname),
+            Attribute("server.hostname", GTelemetry.OTLP._cachedHostname),
         })}
     )
 

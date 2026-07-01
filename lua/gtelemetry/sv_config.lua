@@ -19,11 +19,6 @@ local string_match = string.match
 -- Shared utilities
 GTelemetry.Util = GTelemetry.Util or {}
 
-function GTelemetry.Util.sanitize(s)
-    if not s then return "" end
-    return s:gsub("[%c]", ""):gsub("[\194\128-\194\159]", "")
-end
-
 function GTelemetry.Util.safeConcat(t, sep)
     if not t then return "" end
     local parts = {}

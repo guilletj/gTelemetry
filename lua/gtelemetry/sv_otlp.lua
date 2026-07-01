@@ -89,7 +89,7 @@ function GTelemetry.OTLP.Attribute(key, value)
     if valType == "number" then
         -- Check if finite, then if integer or float
         if value < math.huge and value > -math.huge then
-            if value == math_floor(value) and value < 1e15 and value > -1e15 then
+            if value == math_floor(value) and value <= 1e15 and value >= -1e15 then
                 otlpValue = {intValue = string_format("%.0f", value)}
             else
                 otlpValue = {doubleValue = value}
@@ -125,7 +125,7 @@ function GTelemetry.OTLP.MakeDataPoint(value, attributes)
 
     -- Set value type (NaN/Inf fall back to int = 0 for JSON safety)
     if value < math.huge and value > -math.huge then
-        if value == math_floor(value) and value < 1e15 and value > -1e15 then
+        if value == math_floor(value) and value <= 1e15 and value >= -1e15 then
             dp.asInt = string_format("%.0f", value)
         else
             dp.asDouble = value
