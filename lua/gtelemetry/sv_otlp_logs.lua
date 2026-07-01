@@ -79,9 +79,9 @@ function GTelemetry.OTLP.Logs.ResetBackoff()
 end
 
 function GTelemetry.OTLP.Logs.Init()
+    _stopped = false
     if _initialized then return end
     _initialized = true
-    _stopped = false
 end
 
 --- Add a log entry to the buffer.
@@ -183,22 +183,18 @@ function GTelemetry.OTLP.Logs.Send(jsonBody, recordsToRetry)
     local flushGen = _logGeneration
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            pcall(function()
-                _backoffAttempts = 0
-                _nextSendTime = 0
-                GTelemetry.Debug("Logs sent successfully")
-            end)
+            _backoffAttempts = 0
+            _nextSendTime = 0
+            GTelemetry.Debug("Logs sent successfully")
         end,
         onFailure = function(errMsg)
-            pcall(function()
-                _backoffAttempts = _backoffAttempts + 1
-                _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
-                GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
-                GTelemetry.Warn("Failed to send logs: " .. errMsg)
-                if not _stopped and flushGen == _logGeneration then
-                    _reinsertRecords(recordsToRetry)
-                end
-            end)
+            _backoffAttempts = _backoffAttempts + 1
+            _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
+            GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
+            GTelemetry.Warn("Failed to send logs: " .. errMsg)
+            if not _stopped and flushGen == _logGeneration then
+                _reinsertRecords(recordsToRetry)
+            end
         end,
     })
 

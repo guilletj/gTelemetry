@@ -32,7 +32,8 @@ function GTelemetry.Util.safeConcat(t, sep)
     for _, v in ipairs(t) do
         local s = tostring(v)
         if len + #s >= maxLen then
-            parts[#parts + 1] = s:sub(1, maxLen - len) .. "..."
+            local truncated = s:sub(1, maxLen - len):gsub("[\128-\191]$", "")
+            parts[#parts + 1] = truncated .. "..."
             break
         end
         parts[#parts + 1] = s
@@ -172,18 +173,37 @@ local function _warnIfPrivateIP(url)
     end
 end
 
---- Returns the OTLP endpoint URL.
--- @return string
-function GTelemetry.Config.GetEndpoint()
-    local url = GTelemetry.Config.ConVars.endpoint:GetString()
+local function _validateEndpoint(url, convarName)
     if url == "" then
-        GTelemetry.Warn("No endpoint configured. Set gtelemetry_endpoint ConVar.")
+        GTelemetry.Warn("No " .. convarName .. " configured. Set gtelemetry_" .. convarName .. " ConVar.")
     elseif not string_match(url, "^https?://") then
-        GTelemetry.Warn("Invalid endpoint URL (must start with http:// or https://): " .. url)
+        GTelemetry.Warn("Invalid " .. convarName .. " URL (must start with http:// or https://): " .. url)
         url = ""
     end
     if url ~= "" then _warnIfPrivateIP(url) end
     return url
+end
+
+local function _clampInterval(newVal, min, max, default, name)
+    local val = tonumber(newVal)
+    if not val then
+        GTelemetry.Warn(name .. " must be a number, got '" .. tostring(newVal) .. "', defaulting to " .. default)
+        val = default
+    end
+    if val < min then
+        GTelemetry.Warn(name .. " must be >= " .. min .. ", got " .. tostring(newVal) .. ", clamping to " .. min)
+        val = min
+    elseif val > max then
+        GTelemetry.Warn(name .. " must be <= " .. max .. ", got " .. tostring(newVal) .. ", clamping to " .. max)
+        val = max
+    end
+    return val
+end
+
+--- Returns the OTLP endpoint URL.
+-- @return string
+function GTelemetry.Config.GetEndpoint()
+    return _validateEndpoint(GTelemetry.Config.ConVars.endpoint:GetString(), "endpoint")
 end
 
 --- Returns the collection interval in seconds.
@@ -245,15 +265,7 @@ end
 --- Returns the OTLP log endpoint URL.
 -- @return string
 function GTelemetry.Config.GetLogEndpoint()
-    local url = GTelemetry.Config.ConVars.log_endpoint:GetString()
-    if url == "" then
-        GTelemetry.Warn("No log endpoint configured. Set gtelemetry_log_endpoint ConVar.")
-    elseif not string_match(url, "^https?://") then
-        GTelemetry.Warn("Invalid log endpoint URL (must start with http:// or https://): " .. url)
-        url = ""
-    end
-    if url ~= "" then _warnIfPrivateIP(url) end
-    return url
+    return _validateEndpoint(GTelemetry.Config.ConVars.log_endpoint:GetString(), "log_endpoint")
 end
 
 --- Returns the log flush interval in seconds.
@@ -327,23 +339,10 @@ end
 
 -- Listen for interval changes to recreate the timer
 cvars.AddChangeCallback("gtelemetry_interval", function(_, _, newVal)
-    local interval = tonumber(newVal)
-    if not interval then
-        GTelemetry.Warn("gtelemetry_interval must be a number, got '" .. tostring(newVal) .. "', defaulting to 10")
-        interval = 10
-    end
-    if interval < 1 then
-        GTelemetry.Warn("gtelemetry_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
-        interval = 1
-    elseif interval > 300 then
-        GTelemetry.Warn("gtelemetry_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
-        interval = 300
-    end
-
+    local interval = _clampInterval(newVal, 1, 300, 10, "gtelemetry_interval")
     if interval ~= tonumber(newVal) then
         GTelemetry.Config.ConVars.interval:SetInt(interval)
     end
-
     if timer.Exists("GTelemetry_Collect") then
         timer.Adjust("GTelemetry_Collect", interval)
         GTelemetry.Log("Collection interval changed to " .. interval .. "s")
@@ -460,23 +459,10 @@ end, "gtelemetry_log_blogs_mode_change")
 
 -- Listen for log interval changes to recreate the timer
 cvars.AddChangeCallback("gtelemetry_log_interval", function(_, _, newVal)
-    local interval = tonumber(newVal)
-    if not interval then
-        GTelemetry.Warn("gtelemetry_log_interval must be a number, got '" .. tostring(newVal) .. "', defaulting to 10")
-        interval = 10
-    end
-    if interval < 1 then
-        GTelemetry.Warn("gtelemetry_log_interval must be >= 1, got " .. tostring(newVal) .. ", clamping to 1")
-        interval = 1
-    elseif interval > 300 then
-        GTelemetry.Warn("gtelemetry_log_interval must be <= 300, got " .. tostring(newVal) .. ", clamping to 300")
-        interval = 300
-    end
-
+    local interval = _clampInterval(newVal, 1, 300, 10, "gtelemetry_log_interval")
     if interval ~= tonumber(newVal) then
         GTelemetry.Config.ConVars.log_interval:SetInt(interval)
     end
-
     if timer.Exists("GTelemetry_LogFlush") then
         timer.Adjust("GTelemetry_LogFlush", interval)
         GTelemetry.Log("Log flush interval changed to " .. interval .. "s")

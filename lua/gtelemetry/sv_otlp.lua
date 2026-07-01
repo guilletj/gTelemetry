@@ -290,20 +290,16 @@ function GTelemetry.OTLP.Send(jsonBody)
 
     GTelemetry.OTLP._DoHTTPPost(endpoint, jsonBody, {
         onSuccess = function()
-            pcall(function()
-                _backoffAttempts = 0
-                _nextSendTime = 0
-                GTelemetry.Debug("Metrics sent successfully")
-            end)
+            _backoffAttempts = 0
+            _nextSendTime = 0
+            GTelemetry.Debug("Metrics sent successfully")
         end,
         onFailure = function(errMsg)
-            pcall(function()
-                _backoffAttempts = _backoffAttempts + 1
-                _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
-                GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
-                GTelemetry.Warn("Failed to send metrics: " .. errMsg)
-                GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
-            end)
+            _backoffAttempts = _backoffAttempts + 1
+            _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
+            GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
+            GTelemetry.Warn("Failed to send metrics: " .. errMsg)
+            GTelemetry.Warn("Ensure Alloy is running and the server was started with -allowlocalhttp")
         end,
     })
 end

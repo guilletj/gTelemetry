@@ -120,10 +120,9 @@ end
 function GTelemetry.Collectors.Network.Collect(players)
     if not MakeGauge then GTelemetry.Collectors.Network.Init() end
 
-    -- Failsafe: if another addon overwrote our wrappers, restore and stop counting
+    -- Failsafe: if another addon overwrote our wrappers, stop counting
     if _initialized and net.Start ~= _netStartWrapper then
-        GTelemetry.Warn("Network collector: net.Start was overwritten externally — restoring originals")
-        GTelemetry.Collectors.Network.Undo()
+        GTelemetry.Warn("Network collector: net.Start was overwritten externally — counting may be inaccurate")
         return {}
     end
 

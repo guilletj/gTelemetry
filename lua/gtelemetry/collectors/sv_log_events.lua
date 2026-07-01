@@ -22,6 +22,7 @@ local tostring = tostring
 local AddLog = nil
 local Attribute = nil
 local safeConcat = GTelemetry.Util.safeConcat
+local _lastSamLogTime = 0
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
@@ -187,6 +188,9 @@ function GTelemetry.Collectors.LogEvents.Init()
 
     -- SAM (current hook: SAM.RanCommand)
     hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args)
+        local now = SysTime()
+        if now - _lastSamLogTime < 0.1 then return end
+        _lastSamLogTime = now
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. argsStr
@@ -198,6 +202,9 @@ function GTelemetry.Collectors.LogEvents.Init()
 
     -- SAM fallback (older versions)
     hook.Add("SAM.PlayerCommand", "GTelemetry_LogSAMLegacy", function(ply, cmd, args)
+        local now = SysTime()
+        if now - _lastSamLogTime < 0.1 then return end
+        _lastSamLogTime = now
         local who = IsValid(ply) and ply:Nick() or "Console"
         local argsStr = type(args) == "table" and safeConcat(args) or tostring(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr

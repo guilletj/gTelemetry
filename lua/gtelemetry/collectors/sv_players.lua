@@ -23,6 +23,11 @@ local _clientLoadTimeout = 120 -- seconds before marking a missing ClientReady a
 local _lastMsgTime = {} -- [SteamID] = SysTime() — rate-limit guard
 local math_Round = math.Round
 
+local function _newPlayerData(now)
+    now = now or SysTime()
+    return {fps = 0, kills = 0, deaths = 0, connectTime = now, loadStart = now, loadTime = nil}
+end
+
 local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil
@@ -47,7 +52,7 @@ net.Receive("GTelemetry_ClientData", function(len, ply)
     local steamID = ply:SteamID()
     if _rateLimit(steamID) then return end
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
+        _playerData[steamID] = _newPlayerData()
     end
     local ok, fps = pcall(net.ReadFloat)
     if ok and fps and fps > 0 and fps < 10000 then
@@ -64,21 +69,13 @@ net.Receive("GTelemetry_ClientReady", function(len, ply)
     local steamID = ply:SteamID()
     if _rateLimit(steamID) then return end
     if not _playerData[steamID] then
-        _playerData[steamID] = {fps = 0, kills = 0, deaths = 0, connectTime = SysTime(), loadStart = SysTime(), loadTime = nil}
+        _playerData[steamID] = _newPlayerData()
     end
     local data = _playerData[steamID]
     if not data.loadTime or data.loadTime == -1 then
         data.loadTime = math_Round(SysTime() - data.loadStart, 2)
         if data.loadTime < 0.1 then data.loadTime = 0.1 end
     end
-end)
-
--- Clean up player data on disconnect (module level — persists across enable/disable)
-hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
-    if not IsValid(ply) then return end
-    local sid = ply:SteamID()
-    _playerData[sid] = nil
-    _lastMsgTime[sid] = nil
 end)
 
 --- Initialize references and hooks.
@@ -114,14 +111,7 @@ function GTelemetry.Collectors.Players.Init()
     hook.Add("PlayerInitialSpawn", "GTelemetry_PlayerConnect", function(ply)
         if ply:IsBot() then return end
         local steamID = ply:SteamID()
-        _playerData[steamID] = _playerData[steamID] or {
-            fps = 0,
-            kills = 0,
-            deaths = 0,
-            connectTime = SysTime(),
-            loadStart = SysTime(),
-            loadTime = nil,
-        }
+        _playerData[steamID] = _playerData[steamID] or _newPlayerData()
     end)
 
     -- Pre-populate data for players already connected (late init path)
@@ -129,16 +119,17 @@ function GTelemetry.Collectors.Players.Init()
     for _, ply in ipairs(player.GetAll()) do
         if IsValid(ply) and not ply:IsBot() then
             local steamID = ply:SteamID()
-            _playerData[steamID] = _playerData[steamID] or {
-                fps = 0,
-                kills = 0,
-                deaths = 0,
-                connectTime = now,
-                loadStart = now,
-                loadTime = nil,
-            }
+            _playerData[steamID] = _playerData[steamID] or _newPlayerData(now)
         end
     end
+
+    -- Clean up player data on disconnect
+    hook.Add("PlayerDisconnected", "GTelemetry_PlayerDisconnect", function(ply)
+        if not IsValid(ply) then return end
+        local sid = ply:SteamID()
+        _playerData[sid] = nil
+        _lastMsgTime[sid] = nil
+    end)
 
 end
 
@@ -149,6 +140,7 @@ function GTelemetry.Collectors.Players.Undo()
 
     hook.Remove("PlayerDeath", "GTelemetry_PlayerDeath")
     hook.Remove("PlayerInitialSpawn", "GTelemetry_PlayerConnect")
+    hook.Remove("PlayerDisconnected", "GTelemetry_PlayerDisconnect")
 
     _playerData = {}
     _startTimeNano = nil
