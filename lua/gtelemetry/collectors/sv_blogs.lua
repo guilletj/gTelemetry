@@ -94,6 +94,8 @@ function GTelemetry.Collectors.BLogs.Undo()
 
     _module = nil
     _initMode = nil
+    _serverStartLogged = false
+    _modulePrevMap = nil
     GTelemetry.OTLP.Logs.ClearBuffer()
     GTelemetry.Debug("bLogs bridge stopped")
 end

@@ -32,7 +32,6 @@ local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil
 local MakeCumulativeDataPoint = nil
-local Attribute = nil
 
 -- Register net messages for client data (must be outside Init to avoid race conditions)
 util.AddNetworkString("GTelemetry_ClientData")
@@ -86,7 +85,6 @@ function GTelemetry.Collectors.Players.Init()
     MakeDataPoint = GTelemetry.OTLP.MakeDataPoint
     MakeSum = GTelemetry.OTLP.MakeSum
     MakeCumulativeDataPoint = GTelemetry.OTLP.MakeCumulativeDataPoint
-    Attribute = GTelemetry.OTLP.Attribute
     _startTimeNano = GTelemetry.OTLP.GetTimeNano()
 
 
@@ -143,12 +141,12 @@ function GTelemetry.Collectors.Players.Undo()
     hook.Remove("PlayerDisconnected", "GTelemetry_PlayerDisconnect")
 
     _playerData = {}
+    _lastMsgTime = {}
     _startTimeNano = nil
     MakeGauge = nil
     MakeDataPoint = nil
     MakeSum = nil
     MakeCumulativeDataPoint = nil
-    Attribute = nil
 
     GTelemetry.Debug("Players collector stopped")
 end
