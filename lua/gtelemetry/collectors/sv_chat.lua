@@ -1,12 +1,12 @@
 --[[
     gTelemetry: GMod Telemetry
-    collectors/sv_chat.lua â€” Chat & admin command tracking
+    collectors/sv_chat.lua — Chat & admin command tracking
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
 
     Collects: chat message count, admin command count.
-    Supports auto-detection of common admin mods (ULX, SAM, FAdmin).
+    Supports auto-detection of common admin mods (ULX, SAM, FAdmin, xAdmin).
 ]]
 
 GTelemetry.Collectors = GTelemetry.Collectors or {}
@@ -45,24 +45,12 @@ function GTelemetry.Collectors.Chat.Init()
         _adminCommands = _adminCommands + 1
     end)
 
-    -- FAdmin (multiple hook names for version compat)
-    hook.Add("FAdmin_CommandCalled", "GTelemetry_FAdminTracker", function(ply, cmd, args)
-        _adminCommands = _adminCommands + 1
-    end)
-
-    hook.Add("FAdmin.Server.PlayerCommand", "GTelemetry_FAdminServerTracker", function(ply, cmd, args)
-        _adminCommands = _adminCommands + 1
-    end)
-
+    -- FAdmin (post-exec hook only)
     hook.Add("FAdmin_OnCommandExecuted", "GTelemetry_FAdminExecTracker", function(ply, cmd, args, results)
         _adminCommands = _adminCommands + 1
     end)
 
-    -- xAdmin free and paid versions
-    hook.Add("xAdminCanRunCommand", "GTelemetry_xAdminTracker", function(ply, cmd, args, fromConsole)
-        _adminCommands = _adminCommands + 1
-    end)
-
+    -- xAdmin paid version (post-exec)
     hook.Add("xAdminCommandRun", "GTelemetry_xAdminPaidTracker", function(ply, target, cmd, args)
         _adminCommands = _adminCommands + 1
     end)
@@ -77,10 +65,7 @@ function GTelemetry.Collectors.Chat.Undo()
     hook.Remove("PlayerSay", "GTelemetry_ChatTracker")
     hook.Remove("ULibCommandCalled", "GTelemetry_ULXTracker")
     hook.Remove("SAM.RanCommand", "GTelemetry_SAMTracker_Ran")
-    hook.Remove("FAdmin_CommandCalled", "GTelemetry_FAdminTracker")
-    hook.Remove("FAdmin.Server.PlayerCommand", "GTelemetry_FAdminServerTracker")
     hook.Remove("FAdmin_OnCommandExecuted", "GTelemetry_FAdminExecTracker")
-    hook.Remove("xAdminCanRunCommand", "GTelemetry_xAdminTracker")
     hook.Remove("xAdminCommandRun", "GTelemetry_xAdminPaidTracker")
 
     _chatMessages = 0

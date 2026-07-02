@@ -1,6 +1,6 @@
 --[[
     gTelemetry: GMod Telemetry
-    sv_otlp_logs.lua â€” OTLP LogRecord builder & HTTP transport
+    sv_otlp_logs.lua — OTLP LogRecord builder & HTTP transport
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
@@ -23,7 +23,6 @@ local _bufferSize = 0
 local _bufferStart = 1
 local _initialized = false
 local _logGeneration = 0
-local _flushSnapshot = {}  -- { start, size } captured at flush extraction
 
 GTelemetry.OTLP.Logs.SendFailures = 0
 GTelemetry.OTLP.Logs.DroppedLogs = 0
@@ -34,37 +33,29 @@ local _nextSendTime = 0
 local _maxBackoff = 30
 local _isFlushing = false
 local _stopped = false
---- Prepend records to buffer, using the snapshot captured at flush extraction.
--- This ensures correct buffer positioning even if AddLog ran between extraction
--- and reinsertion (e.g., from an async HTTP callback).
+
+--- Prepend records to buffer, using a new buffer to avoid O(n) shifting.
 local function _reinsertRecords(records)
     if not records or #records == 0 then return end
     local failedCount = #records
-    local snapStart = _flushSnapshot.start
-    local currentStart = _bufferStart
     local currentSize = _bufferSize
     local maxSize = GTelemetry.Config.GetLogBufferSize()
-
-    -- If buffer was reset by Flush() (snapStart > current logical range),
-    -- use position 1 instead of the stale snapshot position.
-    -- This prevents writing records beyond the ring buffer's logical range
-    -- when Flush() reset _bufferStart to 1 but snapStart was captured earlier.
-    local insertPos = snapStart
-    if snapStart > currentStart + currentSize and currentSize < maxSize then
-        insertPos = 1
-    end
-
     local toInsert = math.min(failedCount, maxSize - currentSize)
-    -- Shift existing records (added after flush) to make room at insert position
-    for i = currentSize, 1, -1 do
-        _logBuffer[insertPos + toInsert + i - 1] = _logBuffer[currentStart + i - 1]
-        _logBuffer[currentStart + i - 1] = nil
-    end
+    local newSize = currentSize + toInsert
+    local newBuf = {}
+    local idx = 1
     for i = 1, toInsert do
-        _logBuffer[insertPos + i - 1] = records[i]
+        newBuf[idx] = records[i]
+        idx = idx + 1
     end
-    _bufferStart = insertPos
-    _bufferSize = currentSize + toInsert
+    for i = 0, currentSize - 1 do
+        newBuf[idx] = _logBuffer[_bufferStart + i]
+        _logBuffer[_bufferStart + i] = nil
+        idx = idx + 1
+    end
+    _logBuffer = newBuf
+    _bufferStart = 1
+    _bufferSize = newSize
     if toInsert < failedCount then
         GTelemetry.OTLP.Logs.DroppedLogs = GTelemetry.OTLP.Logs.DroppedLogs + (failedCount - toInsert)
     end
@@ -202,15 +193,13 @@ end
 function GTelemetry.OTLP.Logs.Flush()
     if _bufferSize == 0 then return end
     if _isFlushing then
-        GTelemetry.Debug("Skipping log flush â€” previous flush still in progress")
+        GTelemetry.Debug("Skipping log flush — previous flush still in progress")
         return
     end
     _isFlushing = true
 
     _logGeneration = _logGeneration + 1
     local records = {}
-    _flushSnapshot.start = _bufferStart
-    _flushSnapshot.size = _bufferSize
     for i = 0, _bufferSize - 1 do
         records[i + 1] = _logBuffer[_bufferStart + i]
         _logBuffer[_bufferStart + i] = nil

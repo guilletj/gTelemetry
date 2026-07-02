@@ -416,6 +416,12 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
     local enabled = newVal == "1"
     if enabled then
         GTelemetry.Log("Log collection enabled")
+
+        -- Reset backoff to clear any stale cooldown from previous failures
+        if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
+            GTelemetry.OTLP.Logs.ResetBackoff()
+        end
+
         if GTelemetry.StartLogCollection then
             if not timer.Exists("GTelemetry_LogFlush") then
                 GTelemetry.StartLogCollection()
@@ -482,5 +488,7 @@ cvars.AddChangeCallback("gtelemetry_log_interval", function(_, _, newVal)
         GTelemetry.Log("Log flush interval changed to " .. interval .. "s")
     end
 end, "gtelemetry_log_interval_change")
+
+
 
 

@@ -19,7 +19,6 @@ local _startTimeNano = nil
 local _serverStartSysTime = SysTime()
 local _initialized = false
 local SysTime = SysTime
-local math_floor = math.floor
 local math_Round = math.Round
 local math_min = math.min
 
@@ -109,7 +108,7 @@ function GTelemetry.Collectors.Server.Collect()
 
     -- Lua memory usage (in bytes)
     local kbytes, bytes = collectgarbage("count")
-    local luaMemoryBytes = math_floor(kbytes * 1024 + (bytes or 0))
+    local luaMemoryBytes = kbytes * 1024 + (bytes or 0)
     metrics[#metrics + 1] = MakeGauge(
         "gmod.server.lua_memory",
         "Lua state memory usage",

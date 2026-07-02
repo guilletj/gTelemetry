@@ -1,6 +1,6 @@
 --[[
     gTelemetry: GMod Telemetry
-    collectors/sv_log_events.lua — Log event hooks for OTLP log export
+    collectors/sv_log_events.lua � Log event hooks for OTLP log export
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
@@ -44,9 +44,9 @@ function GTelemetry.Collectors.LogEvents.Init()
     -- Local ref for perf
     local IsLogSpawnEnabled = GTelemetry.Config.IsLogSpawnEnabled
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Chat messages
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerSay", "GTelemetry_LogChat", function(ply, text, teamOnly)
         if not IsValid(ply) then return end
         local prefix = teamOnly and "[TEAM] " or ""
@@ -56,9 +56,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Player joins / leaves
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerInitialSpawn", "GTelemetry_LogJoin", function(ply)
         if not IsValid(ply) then return end
         local body = ply:Nick() .. " (" .. ply:SteamID() .. ") connected"
@@ -77,9 +77,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Combat
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerHurt", "GTelemetry_LogHurt", function(victim, attacker, health, damage)
         if not IsValid(victim) then return end
         local vicName = victim:Nick()
@@ -122,9 +122,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Player state changes
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerChangedTeam", "GTelemetry_LogTeam", function(ply, oldTeam, newTeam)
         if not IsValid(ply) then return end
         local oldName = team.GetName and team.GetName(oldTeam) or tostring(oldTeam)
@@ -136,9 +136,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Vehicle enter / exit
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerEnteredVehicle", "GTelemetry_LogVehicleEnter", function(ply, vehicle, role)
         if not IsValid(ply) or not IsValid(vehicle) then return end
         local body = ply:Nick() .. " entered " .. vehicle:GetClass()
@@ -158,9 +158,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Lua errors
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("OnLuaError", "GTelemetry_LogError", function(error, stacktrace, realm)
         local body = tostring(error)
         if stacktrace then
@@ -172,9 +172,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
-    -- Admin commands — ULX / SAM / FAdmin / xAdmin
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
+    -- Admin commands � ULX / SAM / FAdmin / xAdmin
+    -- ------------------------------------------------------------
     -- ULX
     hook.Add("ULibCommandCalled", "GTelemetry_LogULX", function(ply, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
@@ -214,27 +214,7 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- FAdmin (multiple hook names for version compat)
-    hook.Add("FAdmin_CommandCalled", "GTelemetry_LogFAdmin", function(ply, cmd, args)
-        local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = GTelemetry.Util.safeArgs(args)
-        local body = "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
-        AddLog(SEVERITY_INFO, "INFO", body, {
-            Attribute("log.source", "admin"),
-            Attribute("admin.mod", "fadmin"),
-        })
-    end)
-
-    hook.Add("FAdmin.Server.PlayerCommand", "GTelemetry_LogFAdmin_Server", function(ply, cmd, args)
-        local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = GTelemetry.Util.safeArgs(args)
-        local body = "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
-        AddLog(SEVERITY_INFO, "INFO", body, {
-            Attribute("log.source", "admin"),
-            Attribute("admin.mod", "fadmin"),
-        })
-    end)
-
+    -- FAdmin (post-exec hook only)
     hook.Add("FAdmin_OnCommandExecuted", "GTelemetry_LogFAdmin_Exec", function(ply, cmd, args, results)
         local who = IsValid(ply) and ply:Nick() or "Console"
         local argsStr = GTelemetry.Util.safeArgs(args)
@@ -242,17 +222,6 @@ function GTelemetry.Collectors.LogEvents.Init()
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "admin"),
             Attribute("admin.mod", "fadmin"),
-        })
-    end)
-
-    -- xAdmin free version (pre-execution)
-    hook.Add("xAdminCanRunCommand", "GTelemetry_LogxAdmin", function(ply, cmd, args, fromConsole)
-        local who = IsValid(ply) and ply:Nick() or "Console"
-        local argsStr = GTelemetry.Util.safeArgs(args)
-        local body = "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
-        AddLog(SEVERITY_INFO, "INFO", body, {
-            Attribute("log.source", "admin"),
-            Attribute("admin.mod", "xadmin"),
         })
     end)
 
@@ -267,10 +236,10 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Spawn tracking (props, vehicles, NPCs, SENTs, SWEPs, rags, effects)
     -- Gated behind gtelemetry_log_spawn
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerSpawnedProp", "GTelemetry_LogSpawnProp", function(ply, model, ent)
         if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local body = "[Prop] " .. ply:Nick() .. " spawned " .. tostring(model)
@@ -338,9 +307,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Item pickups / weapon drops (gated behind gtelemetry_log_spawn)
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("PlayerPickupItem", "GTelemetry_LogPickup", function(ply, item)
         if not IsLogSpawnEnabled() or not IsValid(ply) or not ply:IsPlayer() then return end
         local class = IsValid(item) and item:GetClass() or "unknown"
@@ -361,9 +330,9 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     -- Server start / map change / gamemode change / shutdown
-    -- ════════════════════════════════════════════════════════════
+    -- ------------------------------------------------------------
     hook.Add("InitPostEntity", "GTelemetry_LogMap", function()
         local currentMap = game.GetMap() or "unknown"
 
@@ -372,7 +341,7 @@ function GTelemetry.Collectors.LogEvents.Init()
             _prevMap = currentMap
             local hostname = GetHostName and GetHostName() or "unknown"
             local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
-            local body = "Server started — " .. hostname .. ", map: " .. currentMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
+            local body = "Server started � " .. hostname .. ", map: " .. currentMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
             AddLog(SEVERITY_INFO, "INFO", body, {
                 Attribute("log.source", "system"),
                 Attribute("log.event", "server_start"),
@@ -409,7 +378,7 @@ function GTelemetry.Collectors.LogEvents.Init()
         _prevMap = game.GetMap()
         local hostname = GetHostName and GetHostName() or "unknown"
         local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
-        local body = "Server started — " .. hostname .. ", map: " .. _prevMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
+        local body = "Server started � " .. hostname .. ", map: " .. _prevMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "system"),
             Attribute("log.event", "server_start"),
@@ -436,10 +405,7 @@ function GTelemetry.Collectors.LogEvents.Undo()
     hook.Remove("ULibCommandCalled", "GTelemetry_LogULX")
     hook.Remove("SAM.RanCommand", "GTelemetry_LogSAM")
     hook.Remove("SAM.PlayerCommand", "GTelemetry_LogSAMLegacy")
-    hook.Remove("FAdmin_CommandCalled", "GTelemetry_LogFAdmin")
-    hook.Remove("FAdmin.Server.PlayerCommand", "GTelemetry_LogFAdmin_Server")
     hook.Remove("FAdmin_OnCommandExecuted", "GTelemetry_LogFAdmin_Exec")
-    hook.Remove("xAdminCanRunCommand", "GTelemetry_LogxAdmin")
     hook.Remove("xAdminCommandRun", "GTelemetry_LogxAdminPaid")
     hook.Remove("PlayerSpawnedProp", "GTelemetry_LogSpawnProp")
     hook.Remove("PlayerSpawnedVehicle", "GTelemetry_LogSpawnVehicle")

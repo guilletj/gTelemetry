@@ -1,6 +1,6 @@
 --[[
     gTelemetry: GMod Telemetry
-    sv_blogs.lua â€” bLogs (Billy's Logs) bridge: MODULE:Hook + LogPhrase interceptor
+    sv_blogs.lua — bLogs (Billy's Logs) bridge: MODULE:Hook + LogPhrase interceptor
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
@@ -68,7 +68,7 @@ function GTelemetry.Collectors.BLogs.Init()
     if (mode == "replace" or mode == "hybrid") and game.GetMap() and game.GetMap() ~= "" and not _serverStartLogged then
         _serverStartLogged = true
         _modulePrevMap = game.GetMap()
-        AddLog(SEVERITY_INFO, "INFO", "Server started â€” " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. _modulePrevMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
+        AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. _modulePrevMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
     end
 
     GTelemetry.Debug("bLogs bridge initialized (mode: " .. mode .. ")")
@@ -169,21 +169,9 @@ local _hookSpecs = {
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "sam")})
     end},
-    {event = "FAdmin_CommandCalled", id = "GTelemetry_BLogs_fadmin", fn = function(ply, cmd, args)
-        local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
-    end},
-    {event = "FAdmin.Server.PlayerCommand", id = "GTelemetry_BLogs_fadmin_server", fn = function(ply, cmd, args)
-        local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
-    end},
     {event = "FAdmin_OnCommandExecuted", id = "GTelemetry_BLogs_fadmin_exec", fn = function(ply, cmd, args, results)
         local who = IsValid(ply) and ply:Nick() or "Console"
         AddLog(SEVERITY_INFO, "INFO", "[Admin/FAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "fadmin")})
-    end},
-    {event = "xAdminCanRunCommand", id = "GTelemetry_BLogs_xadmin", fn = function(ply, cmd, args, fromConsole)
-        local who = IsValid(ply) and ply:Nick() or "Console"
-        AddLog(SEVERITY_INFO, "INFO", "[Admin/xAdmin] " .. who .. " ran: " .. tostring(cmd) .. " " .. GTelemetry.Util.safeArgs(args), {Attribute("log.source", "admin"), Attribute("admin.mod", "xadmin")})
     end},
     {event = "xAdminCommandRun", id = "GTelemetry_BLogs_xadmin_paid", fn = function(ply, target, cmd, args)
         local who = IsValid(ply) and ply:Nick() or "Console"
@@ -230,7 +218,7 @@ local _hookSpecs = {
         if not _serverStartLogged then
             _serverStartLogged = true
             _modulePrevMap = currentMap
-            AddLog(SEVERITY_INFO, "INFO", "Server started â€” " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. currentMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
+            AddLog(SEVERITY_INFO, "INFO", "Server started — " .. (GetHostName and GetHostName() or "unknown") .. ", map: " .. currentMap .. ", gamemode: " .. (engine.ActiveGamemode and engine.ActiveGamemode() or "unknown") .. ", version: " .. (GTelemetry.Version or "?"), {Attribute("log.source", "system"), Attribute("log.event", "server_start")})
         elseif _modulePrevMap ~= currentMap then
             AddLog(SEVERITY_INFO, "INFO", "Map changed: " .. _modulePrevMap .. " -> " .. currentMap, {Attribute("log.source", "system"), Attribute("log.event", "map_change")})
             _modulePrevMap = currentMap
@@ -342,7 +330,7 @@ function I.Install()
         I._active = true
         GTelemetry.Debug("bLogs bridge: wrapped " .. I._restoreKey .. " on module metatable")
     else
-        GTelemetry.Warn("bLogs bridge: could not find LogPhrase on metatable â€” wrapping AddModule as fallback")
+        GTelemetry.Warn("bLogs bridge: could not find LogPhrase on metatable — wrapping AddModule as fallback")
         I._WrapAddModule()
     end
 end

@@ -372,6 +372,22 @@ function GTelemetry.OTLP.CollectAndSend()
         end
 
         local jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
+
+        -- 48KB safety check: GMod HTTP payload limits may truncate larger payloads
+        if #jsonBody > 48000 then
+            GTelemetry.Warn("Metrics payload exceeds 48KB (" .. #jsonBody .. " bytes) — falling back to health-only metrics")
+            local ok, result = pcall(function()
+                return GTelemetry.Collectors.Server.Collect(players)
+            end)
+            if ok and type(result) == "table" and #result > 0 then
+                jsonBody = GTelemetry.OTLP.BuildPayload(result)
+                if #jsonBody > 48000 then
+                    GTelemetry.Warn("Health-only payload also exceeds 48KB (" .. #jsonBody .. " bytes) — sending original payload")
+                    jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
+                end
+            end
+        end
+
         GTelemetry.OTLP.Send(jsonBody)
 
         GTelemetry.LastCollectionDuration = SysTime() - startWall
@@ -401,3 +417,6 @@ hook.Add("InitPostEntity", "GTelemetry_ReRegister", function()
         GTelemetry.Debug("Collection timer re-registered on map change (interval: " .. interval .. "s)")
     end
 end)
+
+
+
