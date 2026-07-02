@@ -321,7 +321,6 @@ function GTelemetry.OTLP.CollectAndSend()
     if not GTelemetry.Config.IsEnabled() then return end
     if _isCollecting then
         GTelemetry.Debug("Skipping collection â€” previous cycle still in progress")
-        GTelemetry.LastCollectionDuration = nil
         return
     end
     _isCollecting = true
@@ -375,14 +374,14 @@ function GTelemetry.OTLP.CollectAndSend()
 
         -- 48KB safety check: GMod HTTP payload limits may truncate larger payloads
         if #jsonBody > 48000 then
-            GTelemetry.Warn("Metrics payload exceeds 48KB (" .. #jsonBody .. " bytes) — falling back to health-only metrics")
+            GTelemetry.Warn("Metrics payload exceeds 48KB (" .. #jsonBody .. " bytes) ï¿½ falling back to health-only metrics")
             local ok, result = pcall(function()
                 return GTelemetry.Collectors.Server.Collect(players)
             end)
             if ok and type(result) == "table" and #result > 0 then
                 jsonBody = GTelemetry.OTLP.BuildPayload(result)
                 if #jsonBody > 48000 then
-                    GTelemetry.Warn("Health-only payload also exceeds 48KB (" .. #jsonBody .. " bytes) — sending original payload")
+                    GTelemetry.Warn("Health-only payload also exceeds 48KB (" .. #jsonBody .. " bytes) ï¿½ sending original payload")
                     jsonBody = GTelemetry.OTLP.BuildPayload(allMetrics)
                 end
             end

@@ -1,6 +1,6 @@
 --[[
     gTelemetry: GMod Telemetry
-    collectors/sv_network.lua — Network metrics
+    collectors/sv_network.lua ï¿½ Network metrics
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
@@ -37,6 +37,7 @@ local _realNetReceive = net.Receive
 local pairs = pairs
 local ipairs = ipairs
 local math_Round = math.Round
+local string_StartWith = string.StartWith
 local MakeGauge = nil
 local MakeDataPoint = nil
 local MakeSum = nil
@@ -59,14 +60,16 @@ function GTelemetry.Collectors.Network.Init()
     -- (no net.SendToServer / net.Broadcast follows).
     -- This is a best-effort measurement, not byte-exact accounting.
 
-    -- Wrap net.Start to count outgoing messages
+    -- Wrap net.Start to count outgoing messages (excluding gTelemetry internal)
     _netStartWrapper = function(messageName, unreliable)
-        _netMessagesSent = _netMessagesSent + 1
         local msgStr = tostring(messageName)
-        if not _netMessagesSentByName[msgStr] then
-            _netDetailCount = _netDetailCount + 1
+        if not string_StartWith(msgStr, "GTelemetry_") then
+            _netMessagesSent = _netMessagesSent + 1
+            if not _netMessagesSentByName[msgStr] then
+                _netDetailCount = _netDetailCount + 1
+            end
+            _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
         end
-        _netMessagesSentByName[msgStr] = (_netMessagesSentByName[msgStr] or 0) + 1
         return _realNetStart(messageName, unreliable)
     end
     net.Start = _netStartWrapper
@@ -125,7 +128,7 @@ function GTelemetry.Collectors.Network.Collect(players)
 
     -- Failsafe: if another addon overwrote our wrappers, stop counting
     if _initialized and net.Start ~= _netStartWrapper then
-        GTelemetry.Warn("Network collector: net.Start was overwritten externally — counting may be inaccurate")
+        GTelemetry.Warn("Network collector: net.Start was overwritten externally ï¿½ counting may be inaccurate")
         return {}
     end
 
@@ -157,15 +160,16 @@ function GTelemetry.Collectors.Network.Collect(players)
         _netCumulativeReceivedByName[msgName] = (_netCumulativeReceivedByName[msgName] or 0) + count
     end
 
-    -- Reset detail name tables when they exceed _maxDetailEntries to prevent unbounded growth.
-    -- Uses incrementally-updated count to avoid O(n) scan.
+    -- Reset detail and cumulative name tables when they exceed _maxDetailEntries
     if _netDetailCount > _maxDetailEntries then
         _netMessagesSentByName = {}
         _netMessagesReceivedByName = {}
+        _netCumulativeSentByName = {}
+        _netCumulativeReceivedByName = {}
         _netDetailCount = 0
     end
 
-    -- Net messages sent per name (high cardinality — gated)
+    -- Net messages sent per name (high cardinality ï¿½ gated)
     if GTelemetry.Config.IsNetworkDetailsEnabled() then
         local outPoints = {}
         for msgName, count in pairs(_netCumulativeSentByName) do
@@ -205,7 +209,7 @@ function GTelemetry.Collectors.Network.Collect(players)
         end
     end
 
-    -- Active Net Receivers (refreshed every cycle — iteration is cheap)
+    -- Active Net Receivers (refreshed every cycle ï¿½ iteration is cheap)
     if net.Receivers then
         local receiverCount = 0
         for _, _ in pairs(net.Receivers) do
