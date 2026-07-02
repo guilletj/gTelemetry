@@ -55,6 +55,7 @@ local _allTypes = {
 -- Normal table is fine (<200 unique classes per map).
 local _classCache = {}
 local _noPhysicsCache = {}  -- classes confirmed to have no physics object
+local _hasPhysicsCache = {} -- classes confirmed to have a physics object
 
 -- Non-physics prefix pattern. Covers env_, ai_, logic_, math_, light_, trigger_.
 -- 'i' is split explicitly: info_ (no physics) excluded here, item_ (has physics) not.
@@ -110,7 +111,7 @@ local function EntityHasPhysics(class)
     if string_match(class, _physicsNoMatch) then return false end
     if string_StartWith(class, "info_") then return false end
     if string_StartWith(class, "point_") or string_StartWith(class, "path_") then return false end
-    if string_StartWith(class, "scene_") or string_StartWith(class, "shadow_") or string_StartWith(class, "sprite_") then return false end
+    if string_StartWith(class, "scene_") or string_StartWith(class, "shadow_") or string_StartWith(class, "sprite_") or string_StartWith(class, "predicted_") or string_StartWith(class, "move_") or string_StartWith(class, "nav_") then return false end
     return true
 end
 
@@ -135,7 +136,8 @@ function GTelemetry.Collectors.Entities.Undo()
     Attribute = nil
     _cycleCount = 0
     _classCache = {}
-    _noPhysicsCache = {}
+_noPhysicsCache = {}
+    _hasPhysicsCache = {}
 end
 
 --- Collect entity count metrics.
@@ -176,13 +178,16 @@ function GTelemetry.Collectors.Entities.Collect()
 
             -- Physics objects (only check classes that can have physics)
             if EntityHasPhysics(class) then
-                if not _noPhysicsCache[class] then
+                if not _noPhysicsCache[class] and not _hasPhysicsCache[class] then
                     local ok, phys = pcall(ent.GetPhysicsObject, ent)
                     if ok and IsValid(phys) then
+                        _hasPhysicsCache[class] = true
                         physicsCount = physicsCount + 1
                     else
                         _noPhysicsCache[class] = true
                     end
+                elseif _hasPhysicsCache[class] then
+                    physicsCount = physicsCount + 1
                 end
             end
 
