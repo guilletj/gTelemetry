@@ -22,7 +22,7 @@ hook.Add("Think", "GTelemetry_FPSTracker", function()
     local now = SysTime()
     local dt = now - _lastThinkTime
     _lastThinkTime = now
-    if dt <= 0 or dt > 1 then return end
+    if dt <= 0 or dt > 1 then _currentFps = 0 return end
     _currentFps = math.min(1 / dt, 999)
 end)
 
