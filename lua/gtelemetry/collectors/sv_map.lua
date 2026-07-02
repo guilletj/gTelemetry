@@ -47,7 +47,6 @@ function GTelemetry.Collectors.Map.Init()
         GTelemetry.Debug("Map initialized: " .. game.GetMap() .. " (change #" .. _mapChanges .. ")")
     end)
 
-    GTelemetry.Collectors.Map.CountChange()
     _mapChangesAtInit = _mapChanges
 end
 
@@ -76,7 +75,7 @@ function GTelemetry.Collectors.Map.Collect()
     local currentMap = game.GetMap() or "unknown"
     local gm = gmod.GetGamemode()
     local gamemodeName = gm and gm.Name or "unknown"
-    if not GTelemetry.OTLP._cachedHostname then GTelemetry.OTLP._cachedHostname = GetHostName and GetHostName() or "unknown" end
+    -- hostname is cached in sv_otlp.lua BuildPayload
 
     -- Server info (always value 1, metadata carried as labels)
     metrics[#metrics + 1] = MakeGauge(
