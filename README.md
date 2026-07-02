@@ -111,7 +111,7 @@ All settings are managed via server ConVars — no config files. See [`docs/cvar
 | `gtelemetry_debug` | `0` | Enable verbose debug logging to server console |
 | `gtelemetry_darkrp` | `1` | Enable DarkRP economic metrics (still requires DarkRP) |
 | `gtelemetry_entities_per_player` | `1` | Enable per-player entity ownership breakdown (high cardinality) |
-| `gtelemetry_entities_interval` | `1` | Collect entity metrics every N cycles (1 = every cycle). Higher values reduce CPU on large maps |
+| `gtelemetry_entities_interval` | `5` | Collect entity metrics every N cycles (1 = every cycle). Higher values reduce CPU on large maps |
 | `gtelemetry_network_details` | `0` | Enable per-message-name net message breakdown (high cardinality) |
 | `gtelemetry_version` | `1.5.8` | Version info (replicated to clients) |
 
@@ -142,7 +142,7 @@ gTelemetry uses a **3-level pipeline** for metrics:
 │  Triggers CollectAndSend() which calls every collector.  │
 │  Each collector re-samples its data at this moment.      │
 │                                                          │
-│  gtelemetry_entities_interval (default 1):               │
+│  gtelemetry_entities_interval (default 5):               │
 │  Controls how many cycles pass between entity scans.     │
 │  At 5, entities are scanned every 5th cycle (every 50s  │
 │  if gtelemetry_interval is 10).                          │
