@@ -1,6 +1,6 @@
 --[[
     gTelemetry: GMod Telemetry
-    collectors/sv_log_events.lua — Log event hooks for OTLP log export
+    collectors/sv_log_events.lua ï¿½ Log event hooks for OTLP log export
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
@@ -21,8 +21,8 @@ local _serverStartLogged = false
 local tostring = tostring
 local AddLog = nil
 local Attribute = nil
-local safeConcat = GTelemetry.Util.safeConcat
-local _lastSamLogTime = 0
+local _lastSamRanLogTime = 0
+local _lastSamPlayerLogTime = 0
 
 local SEVERITY_INFO = 9
 local SEVERITY_WARN = 13
@@ -173,7 +173,7 @@ function GTelemetry.Collectors.LogEvents.Init()
     end)
 
     -- ------------------------------------------------------------
-    -- Admin commands — ULX / SAM / FAdmin / xAdmin
+    -- Admin commands ï¿½ ULX / SAM / FAdmin / xAdmin
     -- ------------------------------------------------------------
     -- ULX
     hook.Add("ULibCommandCalled", "GTelemetry_LogULX", function(ply, cmd, args)
@@ -186,11 +186,11 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- SAM (current hook: SAM.RanCommand)
+-- SAM (current hook: SAM.RanCommand)
     hook.Add("SAM.RanCommand", "GTelemetry_LogSAM", function(ply, cmd_name, args)
         local now = SysTime()
-        if now - _lastSamLogTime < 0.1 then return end
-        _lastSamLogTime = now
+        if now - _lastSamRanLogTime < 0.1 then return end
+        _lastSamRanLogTime = now
         local who = type(ply) == "string" and ply or (IsValid(ply) and ply:Nick() or "Console")
         local argsStr = GTelemetry.Util.safeArgs(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd_name) .. " " .. argsStr
@@ -200,11 +200,11 @@ function GTelemetry.Collectors.LogEvents.Init()
         })
     end)
 
-    -- SAM fallback (older versions)
+-- SAM fallback (older versions)
     hook.Add("SAM.PlayerCommand", "GTelemetry_LogSAMLegacy", function(ply, cmd, args)
         local now = SysTime()
-        if now - _lastSamLogTime < 0.1 then return end
-        _lastSamLogTime = now
+        if now - _lastSamPlayerLogTime < 0.1 then return end
+        _lastSamPlayerLogTime = now
         local who = IsValid(ply) and ply:Nick() or "Console"
         local argsStr = GTelemetry.Util.safeArgs(args)
         local body = "[Admin/SAM] " .. who .. " ran: " .. tostring(cmd) .. " " .. argsStr
@@ -341,7 +341,7 @@ function GTelemetry.Collectors.LogEvents.Init()
             _prevMap = currentMap
             local hostname = GetHostName and GetHostName() or "unknown"
             local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
-            local body = "Server started — " .. hostname .. ", map: " .. currentMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
+            local body = "Server started ï¿½ " .. hostname .. ", map: " .. currentMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
             AddLog(SEVERITY_INFO, "INFO", body, {
                 Attribute("log.source", "system"),
                 Attribute("log.event", "server_start"),
@@ -378,7 +378,7 @@ function GTelemetry.Collectors.LogEvents.Init()
         _prevMap = game.GetMap()
         local hostname = GetHostName and GetHostName() or "unknown"
         local gm = (engine.ActiveGamemode and engine.ActiveGamemode()) or "unknown"
-        local body = "Server started — " .. hostname .. ", map: " .. _prevMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
+        local body = "Server started ï¿½ " .. hostname .. ", map: " .. _prevMap .. ", gamemode: " .. gm .. ", version: " .. (GTelemetry.Version or "?")
         AddLog(SEVERITY_INFO, "INFO", body, {
             Attribute("log.source", "system"),
             Attribute("log.event", "server_start"),
