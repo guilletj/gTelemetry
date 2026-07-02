@@ -176,7 +176,8 @@ function GTelemetry.OTLP.Logs.Send(jsonBody, recordsToRetry)
             GTelemetry.Debug("Logs sent successfully")
         end,
         onFailure = function(errMsg)
-            _backoffAttempts = _backoffAttempts + 1
+_backoffAttempts = _backoffAttempts + 1
+            _backoffAttempts = math.min(_backoffAttempts, _maxBackoff)
             _nextSendTime = SysTime() + math_min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.Logs.SendFailures = GTelemetry.OTLP.Logs.SendFailures + 1
             GTelemetry.Warn("Failed to send logs: " .. errMsg)

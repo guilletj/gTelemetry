@@ -102,6 +102,7 @@ function GTelemetry.OTLP.Attribute(key, value)
     else
         local s = tostring(value)
         s = s:gsub("[\000-\008\011\012\014-\031\127]", "")
+        s = s:sub(1, 1024) -- prevent payload bloat from excessively long attribute values
         otlpValue = {stringValue = s}
     end
 
@@ -305,6 +306,7 @@ function GTelemetry.OTLP.Send(jsonBody)
         end,
         onFailure = function(errMsg)
             _backoffAttempts = _backoffAttempts + 1
+            _backoffAttempts = math.min(_backoffAttempts, _maxBackoff)
             _nextSendTime = SysTime() + math.min(2 ^ _backoffAttempts, _maxBackoff)
             GTelemetry.OTLP.SendFailures = GTelemetry.OTLP.SendFailures + 1
             GTelemetry.Warn("Failed to send metrics: " .. errMsg)
