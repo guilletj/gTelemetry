@@ -1,6 +1,6 @@
 --[[
     gTelemetry: GMod Telemetry
-    sv_otlp_logs.lua — OTLP LogRecord builder & HTTP transport
+    sv_otlp_logs.lua ï¿½ OTLP LogRecord builder & HTTP transport
 
     SPDX-License-Identifier: MIT
     Copyright (c) 2026 Edyone
@@ -193,7 +193,7 @@ end
 function GTelemetry.OTLP.Logs.Flush()
     if _bufferSize == 0 then return end
     if _isFlushing then
-        GTelemetry.Debug("Skipping log flush — previous flush still in progress")
+        GTelemetry.Debug("Skipping log flush ï¿½ previous flush still in progress")
         return
     end
     _isFlushing = true
@@ -226,6 +226,13 @@ function GTelemetry.OTLP.Logs.Flush()
     end
 
     _isFlushing = false
+end
+
+--- Disable log collection: set stopped flag to prevent re-insertion on failure.
+-- Does NOT clear the buffer â€” call Flush() after for best-effort send.
+function GTelemetry.OTLP.Logs.Disable()
+    _stopped = true
+    GTelemetry.Debug("Log collector disabled â€” no further re-insertions")
 end
 
 --- Clear buffer without sending.

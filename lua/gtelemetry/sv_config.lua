@@ -174,8 +174,17 @@ end
 local function _warnIfPrivateIP(url)
     local host = string_match(url, "^https?://([^:/]+)")
     if not host then return end
-    if string_match(host, "^10%.") or string_match(host, "^172%.(1[6-9]|2[0-9]|3[01])%.") or string_match(host, "^192%.168%.") then
+    if string_match(host, "^10%.") or string_match(host, "^192%.168%.") then
         GTelemetry.Warn("Endpoint points to a private IP (" .. host .. ") — confirm this is intentional")
+    else
+        local a, b = string_match(host, "^(%d+)%.(%d+)%.")
+        if a and b then
+            local aNum = tonumber(a)
+            local bNum = tonumber(b)
+            if aNum == 172 and bNum >= 16 and bNum <= 31 then
+                GTelemetry.Warn("Endpoint points to a private IP (" .. host .. ") — confirm this is intentional")
+            end
+        end
     end
 end
 
@@ -396,9 +405,10 @@ cvars.AddChangeCallback("gtelemetry_enabled", function(_, _, newVal)
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
         end
-        -- Flush buffered logs before clearing
+        -- Flush buffered logs before clearing (disable first to prevent re-insertion)
         if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
-            GTelemetry.OTLP.Logs.Flush()
+            GTelemetry.OTLP.Logs.Disable()
+            pcall(function() GTelemetry.OTLP.Logs.Flush() end)
         end
         for name, collector in pairs(GTelemetry.Collectors) do
             if collector.Undo then
@@ -432,7 +442,8 @@ cvars.AddChangeCallback("gtelemetry_log_enabled", function(_, _, newVal)
     else
         GTelemetry.Log("Log collection disabled")
         if GTelemetry.OTLP and GTelemetry.OTLP.Logs then
-            GTelemetry.OTLP.Logs.Flush()
+            GTelemetry.OTLP.Logs.Disable() -- prevent re-insertion on async failure
+            pcall(function() GTelemetry.OTLP.Logs.Flush() end) -- best-effort send
         end
         if timer.Exists("GTelemetry_LogFlush") then
             timer.Remove("GTelemetry_LogFlush")
