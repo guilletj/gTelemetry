@@ -70,8 +70,9 @@ function GTelemetry.Collectors.DarkRP.Collect(players)
             if IsValid(ply) and not ply:IsBot() then
                 humanCount = humanCount + 1
 
-                -- Money
-                local money = ply.getDarkRPVar and ply:getDarkRPVar("money") or 0
+                -- Money (guard NaN/Inf: a corrupted save or mod can return non-finite values)
+                local rawMoney = ply.getDarkRPVar and ply:getDarkRPVar("money")
+                local money = type(rawMoney) == "number" and rawMoney < math.huge and rawMoney > -math.huge and rawMoney or 0
                 totalMoney = totalMoney + money
                 if money > 0 then
                     moneyPoints[#moneyPoints + 1] = MakeDataPoint(money, GTelemetry.OTLP.PlayerAttrs(ply:Nick(), ply:SteamID()))
