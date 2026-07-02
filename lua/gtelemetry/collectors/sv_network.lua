@@ -160,12 +160,10 @@ function GTelemetry.Collectors.Network.Collect(players)
         _netCumulativeReceivedByName[msgName] = (_netCumulativeReceivedByName[msgName] or 0) + count
     end
 
-    -- Reset detail and cumulative name tables when they exceed _maxDetailEntries
+    -- Reset detail name tables when they exceed _maxDetailEntries
     if _netDetailCount > _maxDetailEntries then
         _netMessagesSentByName = {}
         _netMessagesReceivedByName = {}
-        _netCumulativeSentByName = {}
-        _netCumulativeReceivedByName = {}
         _netDetailCount = 0
     end
 
