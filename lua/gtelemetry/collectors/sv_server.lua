@@ -107,8 +107,9 @@ function GTelemetry.Collectors.Server.Collect()
     )
 
     -- Lua memory usage (in bytes)
-    local kbytes, bytes = collectgarbage("count")
-    local luaMemoryBytes = kbytes * 1024 + (bytes or 0)
+    -- Note: LuaJIT collectgarbage("count") returns (kbytes, 1024) — ignore second value to avoid double-count
+    local kbytes = collectgarbage("count")
+    local luaMemoryBytes = kbytes * 1024
     metrics[#metrics + 1] = MakeGauge(
         "gmod.server.lua_memory",
         "Lua state memory usage",
